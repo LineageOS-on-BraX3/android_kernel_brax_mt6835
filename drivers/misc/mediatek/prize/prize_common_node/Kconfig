@@ -1,0 +1,8 @@
+
+config PRIZE_COMMON_NODE
+	tristate "common node"
+	default n
+	help
+	  common_node. If configures to be n, means devices doesn't support
+	  common_node functionality.
+ 

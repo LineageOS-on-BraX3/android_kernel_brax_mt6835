@@ -1,0 +1,9 @@
+// SPDX-License-Identifier: GPL-2.0
+/* Copyright (c) 2020 MediaTek Inc. */
+/* CAMERA GPIO standardization */
+
+
+#include "mediatek/cust_mt6835_camera_common.dtsi"
+&kd_camera_hw1 {
+	cust-sensor = "s5k3l8_mipi_raw ov50c40_mipi_raw gc05a2sub_mipi_raw";
+};
