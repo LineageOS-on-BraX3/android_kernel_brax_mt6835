@@ -34,8 +34,8 @@
 *****************************************************************************/
 #include "focaltech_core.h"
 
-#ifdef CONFIG_PRIZE_COMMON_NODE
-#include "../../../misc/prize/prize_common_node/prize_common_node.h"
+#if IS_ENABLED(CONFIG_PRIZE_COMMON_NODE)
+#include "../../../misc/mediatek/prize/prize_common_node/prize_common_node.h"
 #endif
 
 /******************************************************************************
@@ -455,7 +455,7 @@ int fts_gesture_resume(struct fts_ts_data *ts_data)
     return 0;
 }
 
-#ifdef CONFIG_PRIZE_COMMON_NODE
+#if IS_ENABLED(CONFIG_PRIZE_COMMON_NODE)
 static void fts_double_type_func(unsigned char on)
 {
     struct fts_ts_data *ts_data = fts_data;
@@ -522,7 +522,7 @@ int fts_gesture_init(struct fts_ts_data *ts_data)
     __set_bit(KEY_GESTURE_Z, input_dev->keybit);
 
     fts_create_gesture_sysfs(ts_data->dev);
-#ifdef CONFIG_PRIZE_COMMON_NODE
+#if IS_ENABLED(CONFIG_PRIZE_COMMON_NODE)
 	prize_common_node_register("GESTURE", &fts_double_type_func);
 #endif
     memset(&fts_gesture_data, 0, sizeof(struct fts_gesture_st));

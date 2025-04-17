@@ -571,6 +571,7 @@ static struct mtk_panel_params ext_params_90 = {
 	},
 	//.lfr_enable = 1,
 	//.lfr_minimum_fps = 60,
+    .lcm_index = 0, //drv-mod by shenwenbin for compatible with two panel PQ 20240902
 };
 static struct mtk_panel_params ext_params_60 = {
 	//.vfp_low_power = 2540,//60hz
@@ -589,6 +590,7 @@ static struct mtk_panel_params ext_params_60 = {
 	},
 	//.lfr_enable = 1,
 	//.lfr_minimum_fps = 60,
+    .lcm_index = 0, //drv-mod by shenwenbin for compatible with two panel PQ 20240902
 };
 
 static struct drm_display_mode *get_mode_by_id(struct drm_connector *connector,

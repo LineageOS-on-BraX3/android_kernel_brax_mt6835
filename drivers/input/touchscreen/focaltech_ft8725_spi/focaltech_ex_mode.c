@@ -38,16 +38,7 @@
 * 2.Private constant and macro definitions using #define
 *****************************************************************************/
 
-/*****************************************************************************
-* 3.Private enumerations, structures and unions using typedef
-*****************************************************************************/
-enum _ex_mode {
-    MODE_GLOVE = 0,
-    MODE_COVER,
-    MODE_CHARGER,
-    MODE_EARPHONE,
-    MODE_EDGEPALM
-};
+
 
 /*****************************************************************************
 * 4.Static variables
@@ -82,7 +73,7 @@ static int fts_ex_mode_set_reg(u8 mode_regaddr, u8 mode_regval)
     return 0;
 }
 
-static int fts_ex_mode_switch(enum _ex_mode mode, int value)
+int fts_ex_mode_switch(enum _ex_mode mode, int value)
 {
     int ret = 0;
 
@@ -347,10 +338,16 @@ int fts_ex_mode_recovery(struct fts_ts_data *ts_data)
     if (ts_data->cover_mode) {
         fts_ex_mode_switch(MODE_COVER, ENABLE);
     }
-
-    if (ts_data->charger_mode) {
+//drv-modify by shenwenbin for TP charger mode 20240304 start
+#if FTS_CHARGER_MODE_EN
+	//FTS_INFO("ts_data->charger_status = %d;ts_data->charger_mode = %d",ts_data->charger_status,ts_data->charger_mode);
+	fts_ex_mode_switch(MODE_CHARGER, ts_data->charger_mode);
+#else
+	if (ts_data->charger_mode) {
         fts_ex_mode_switch(MODE_CHARGER, ENABLE);
     }
+#endif
+//drv-modify by shenwenbin for TP charger mode 20240304 end
 
     if (ts_data->earphone_mode) {
         fts_ex_mode_switch(MODE_EARPHONE, ENABLE);
@@ -391,6 +388,28 @@ static ssize_t state_show(struct kobject *kobj, struct kobj_attribute *attr, cha
 static ssize_t state_store(struct kobject *kobj, struct kobj_attribute *attr, const char *buf, size_t count)
 {
     struct fts_ts_data *ts_data = glove_ts_data;
+    struct power_supply *psy = NULL;
+    union power_supply_propval online;
+
+    // Check if the touch panel is suspended
+    if (ts_data->suspended) {
+        FTS_INFO("Touch panel is suspended, returning without changing glove mode");
+        return count;
+    }
+    // Get power supply object by "mtk-master-charger"
+    psy = power_supply_get_by_name("mtk-master-charger");
+
+    if (!psy) {
+        // FTS_ERROR("Couldn't get power supply\n");
+        return count;
+    }
+    // Get POWER_SUPPLY_PROP_ONLINE property
+    if (power_supply_get_property(psy, POWER_SUPPLY_PROP_ONLINE, &online) < 0) {
+        // FTS_ERROR("Couldn't get power supply online property\n");
+        power_supply_put(psy);  // Release power supply object
+        return count;
+    }
+    power_supply_put(psy);  // Release power supply object
 
     if (!ts_data) {
         pr_err("state_store: ts_data is NULL\n");
@@ -401,11 +420,17 @@ static ssize_t state_store(struct kobject *kobj, struct kobj_attribute *attr, co
     if (FTS_SYSFS_ECHO_ON(buf)) {
         FTS_DEBUG("enter glove mode");
         ts_data->glove_mode = ENABLE;
-        fts_ex_mode_switch(MODE_GLOVE, ENABLE);
+        ts_data->prev_glove_mode = ENABLE;  // Update prev_glove_mode to reflect the manual change
+        if (!online.intval) {
+            fts_ex_mode_switch(MODE_GLOVE, ENABLE);
+        }
     } else if (FTS_SYSFS_ECHO_OFF(buf)) {
         FTS_DEBUG("exit glove mode");
         ts_data->glove_mode = DISABLE;
-        fts_ex_mode_switch(MODE_GLOVE, DISABLE);
+        ts_data->prev_glove_mode = DISABLE;  // Update prev_glove_mode to reflect the manual change
+        if (!online.intval) {
+            fts_ex_mode_switch(MODE_GLOVE, DISABLE);
+        }
     }
     mutex_unlock(&ts_data->input_dev->mutex);
 

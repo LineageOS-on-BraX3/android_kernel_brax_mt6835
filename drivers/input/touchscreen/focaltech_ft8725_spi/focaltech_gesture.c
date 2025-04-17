@@ -34,7 +34,7 @@
 *****************************************************************************/
 #include "focaltech_core.h"
 //drv Added the double-click wake up function-pzp-20240817-start
-#if 1
+#if IS_ENABLED(CONFIG_PRIZE_COMMON_NODE)
 #include "../../../misc/mediatek/prize/prize_common_node/prize_common_node.h"
 #endif
 //drv Added the double-click wake up function-pzp-20240817-end
@@ -453,7 +453,7 @@ int fts_gesture_resume(struct fts_ts_data *ts_data)
     return 0;
 }
 //drv Added the double-click wake up function-pzp-20240817-start
-#if 1
+#if IS_ENABLED(CONFIG_PRIZE_COMMON_NODE)
 static void fts_double_type_func(unsigned char on)
 {
     struct fts_ts_data *ts_data = fts_data;
@@ -521,7 +521,7 @@ int fts_gesture_init(struct fts_ts_data *ts_data)
 
     fts_create_gesture_sysfs(ts_data->dev);
 //drv Added the double-click wake up function-pzp-20240817-start
-    #if 1
+    #if IS_ENABLED(CONFIG_PRIZE_COMMON_NODE)
 	prize_common_node_register("GESTURE", &fts_double_type_func);
     #endif
 //drv Added the double-click wake up function-pzp-20240817-start

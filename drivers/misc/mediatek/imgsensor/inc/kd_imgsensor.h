@@ -654,8 +654,20 @@
 #define SENSOR_DRVNAME_BF2257CSMACRO_MIPI_RAW	"bf2257csmacro_mipi_raw"
 //prize add by linchong 20231014 end
 /*prize add by zhuzhengjiang for camera start*/
+#define GC02M1MACRO_SENSOR_ID                        0x2E0+1
+#define SENSOR_DRVNAME_GC02M1MACRO_MIPI_RAW 	     "gc02m1macro_mipi_raw"
 #define IMX682_SENSOR_ID                        0x0682
 #define SENSOR_DRVNAME_IMX682_MIPI_RAW          "imx682_mipi_raw"
+
+#define IMX682GMS_SENSOR_ID                     (0x0682+0x1000)
+#define SENSOR_DRVNAME_IMX682GMS_MIPI_RAW       "imx682gms_mipi_raw"
+
+#define IMX550_SENSOR_ID                        0x0550
+#define SENSOR_DRVNAME_IMX550_MIPI_RAW          "imx550_mipi_raw"
+
+#define S5K3P8SPGMS_SENSOR_ID                   (0x3108+0x1000)
+#define SENSOR_DRVNAME_S5K3P8SPGMS_MIPI_RAW     "s5k3p8spgms_mipi_raw"
+
 #define GC08A3SUB_SENSOR_ID			            0x08a4
 #define SENSOR_DRVNAME_GC08A3SUB_MIPI_RAW       "gc08a3sub_mipi_raw"
 #define SC202CSMACROMIPI_SENSOR_ID              0xEB52+2

@@ -5,5 +5,5 @@
 
 #include "mediatek/cust_mt6835_camera_common.dtsi"
 &kd_camera_hw1 {
-	cust-sensor = "s5k3l8_mipi_raw ov50c40_mipi_raw gc05a2sub_mipi_raw";
+	cust-sensor = "s5k3l8_mipi_raw ov50c40_mipi_raw gc05a2sub_mipi_raw bf2257csmacro_mipi_raw";
 };

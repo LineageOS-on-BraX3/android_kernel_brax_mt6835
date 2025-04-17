@@ -126,13 +126,13 @@
 				<PINMUX_GPIO78__FUNC_MSDC1_DAT3>,
 				<PINMUX_GPIO74__FUNC_MSDC1_CMD>;
 			input-enable;
-			drive-strength = <3>;
+			drive-strength = <4>; //pri modify sd drive strength ,20240826
 			bias-pull-up = <MTK_PUPD_SET_R1R0_01>;
 		};
 
 		pins_clk {
 			pinmux = <PINMUX_GPIO73__FUNC_MSDC1_CLK>;
-			drive-strength = <3>;
+			drive-strength = <4>; //pri modify sd drive strength ,20240826
 			bias-pull-down = <MTK_PUPD_SET_R1R0_10>;
 		};
 	};
@@ -144,13 +144,13 @@
 				<PINMUX_GPIO78__FUNC_MSDC1_DAT3>,
 				<PINMUX_GPIO74__FUNC_MSDC1_CMD>;
 			input-enable;
-			drive-strength = <3>;
+			drive-strength = <4>; //pri modify sd drive strength ,20240826
 			bias-pull-up = <MTK_PUPD_SET_R1R0_01>;
 		};
 
 		pins_clk {
 			pinmux = <PINMUX_GPIO73__FUNC_MSDC1_CLK>;
-			drive-strength = <3>;
+			drive-strength = <4>; //pri modify sd drive strength ,20240826
 			bias-pull-down = <MTK_PUPD_SET_R1R0_10>;
 		};
 	};

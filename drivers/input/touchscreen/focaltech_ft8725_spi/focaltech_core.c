@@ -44,7 +44,12 @@
 #endif
 
 #include "focaltech_core.h"
-
+ /* drv added by pzp, touch data reporting contrl, start */
+#if IS_ENABLED(CONFIG_PRIZE_UNDERWATER_TOUCH_CONTROL)
+#include "../../../misc/mediatek/prize/prize_common_node/prize_common_node.h"
+extern bool underwater_report_status;
+#endif
+ /* drv added by pzp, touch data reporting contrl, start */
 /*****************************************************************************
 * Private constant and macro definitions using #define
 *****************************************************************************/
@@ -617,7 +622,14 @@ void fts_release_all_finger(void)
     u32 finger_count = 0;
     u32 max_touches = ts_data->pdata->max_touch_number;
 #endif
-
+	 /* drv added by pzp, touch data reporting contrl, start */
+#if IS_ENABLED(CONFIG_PRIZE_UNDERWATER_TOUCH_CONTROL)
+   
+    if (underwater_report_status == false) {
+        return;
+    }
+    /* drv added by pzp, touch data reporting contrl, end */
+#endif
     mutex_lock(&ts_data->report_mutex);
 #if FTS_MT_PROTOCOL_B_EN
     for (finger_count = 0; finger_count < max_touches; finger_count++) {
@@ -659,7 +671,15 @@ static int fts_input_report_key(struct fts_ts_data *ts_data, struct ts_event *ke
     int y = kevent->y;
     int *x_dim = &ts_data->pdata->key_x_coords[0];
     int *y_dim = &ts_data->pdata->key_y_coords[0];
+	 /* drv added by pzp, touch data reporting contrl, start */
+    #if IS_ENABLED(CONFIG_PRIZE_UNDERWATER_TOUCH_CONTROL)
 
+    if (underwater_report_status == false) {
+        return 0;
+    }
+    
+	#endif
+ /* drv added by pzp, touch data reporting contrl, start */
     if (!ts_data->pdata->have_key) {
         return -EINVAL;
     }
@@ -692,7 +712,15 @@ static int fts_input_report_b(struct fts_ts_data *ts_data, struct ts_event *even
     u32 max_touch_num = ts_data->pdata->max_touch_number;
     bool touch_event_coordinate = false;
     struct input_dev *input_dev = ts_data->input_dev;
-
+	 /* drv added by pzp, touch data reporting contrl, start */
+#if IS_ENABLED(CONFIG_PRIZE_UNDERWATER_TOUCH_CONTROL)
+   
+    if (underwater_report_status == false) {
+        return 0;
+    }
+  
+#endif
+ /* drv added by pzp, touch data reporting contrl, start */
     for (i = 0; i < ts_data->touch_event_num; i++) {
         if (fts_input_report_key(ts_data, &events[i]) == 0) {
             continue;
@@ -757,7 +785,15 @@ static int fts_input_report_a(struct fts_ts_data *ts_data, struct ts_event *even
     int touch_down_point_num_cur = 0;
     bool touch_event_coordinate = false;
     struct input_dev *input_dev = ts_data->input_dev;
-
+	 /* drv added by pzp, touch data reporting contrl, start */
+    #if IS_ENABLED(CONFIG_PRIZE_UNDERWATER_TOUCH_CONTROL)
+   
+    if (underwater_report_status == false) {
+        return 0;
+    }
+   
+#endif
+ /* drv added by pzp, touch data reporting contrl, end */
     for (i = 0; i < ts_data->touch_event_num; i++) {
         if (fts_input_report_key(ts_data, &events[i]) == 0) {
             continue;
@@ -1279,6 +1315,140 @@ static int fts_irq_registration(struct fts_ts_data *ts_data)
 
     return ret;
 }
+
+//drv-modify by shenwenbin for TP charger mode 20240304 start
+#if FTS_CHARGER_MODE_EN
+/* add_for_charger_mode */
+static void fts_update_charger(struct work_struct *work)
+{
+    int ret = 0;
+    struct fts_ts_data *ts_data = fts_data;
+
+    mutex_lock(&ts_data->ts_data_lock);  // Lock
+
+   
+
+    if (!ts_data->suspended && (ts_data->fw_loading == 0)) {
+     //   FTS_INFO("pzp enter charger mode switch last_charger_mode=%d,last_glove_mode=%d", ts_data->charger_mode, ts_data->glove_mode);
+        if (ts_data->glove_mode) {
+            ret = fts_ex_mode_switch(MODE_GLOVE, !ts_data->charger_mode);
+            if (ret < 0) {
+                FTS_ERROR("Failed to switch glove mode, rc=%d\n", ret);
+            }
+        }
+
+        ret = fts_ex_mode_switch(MODE_CHARGER, ts_data->charger_mode);
+        if (ret >= 0) {
+            FTS_INFO("pzp switch charger mode successfully");
+        } else {
+            FTS_INFO("pzp Failed to switch charger mode, rc=%d\n", ret);
+        }
+    }
+
+    // Restore previous glove mode if not online, not already restored, and glove_mode is not DISABLE
+    if (!ts_data->online.intval && !ts_data->glove_mode_restored && ts_data->glove_mode != DISABLE) {
+        if (ts_data->glove_mode != ts_data->prev_glove_mode) {
+            ts_data->glove_mode = ts_data->prev_glove_mode;
+            //FTS_INFO("pzp Restoring previous glove mode to %d", ts_data->prev_glove_mode);
+            ret = fts_ex_mode_switch(MODE_GLOVE, ts_data->glove_mode);
+            if (ret < 0) {
+                FTS_ERROR("pzp Failed to restore glove mode, rc=%d\n", ret);
+            } else {
+                ts_data->glove_mode_restored = true;  // Set the flag to indicate glove mode has been restored
+            }
+        }
+    } else if (ts_data->online.intval) {
+        ts_data->prev_glove_mode = ts_data->glove_mode;  // Update the previous glove mode only if online
+    }
+
+    mutex_unlock(&ts_data->ts_data_lock);  // Unlock
+}
+
+static int fts_charger_notifier_callback(struct notifier_block *nb, unsigned long val, void *v)
+{
+    int ret = 0;
+    struct power_supply *psy = NULL;
+    struct fts_ts_data *ts_data = fts_data;
+
+    // Get power supply object by "mtk-master-charger"
+    psy = power_supply_get_by_name("mtk-master-charger");
+
+    if (!psy) {
+        FTS_ERROR("Couldn't get power supply\n");
+        return -EINVAL;
+    }
+
+    // Get POWER_SUPPLY_PROP_ONLINE property
+    ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_ONLINE, &ts_data->online);
+    if (ret < 0) {
+        FTS_ERROR("Couldn't get power supply online property, rc=%d\n", ret);
+        power_supply_put(psy);  // Release power supply object
+        return ret;
+    }
+
+     // Set charger_mode based on online property
+    if (ts_data->online.intval) {
+        ts_data->charger_mode = ENABLE;
+        //FTS_INFO("pzp Charger is online, enabling charger mode");
+        ts_data->glove_mode_restored = false;  // Reset the flag when online
+    } else {
+        ts_data->charger_mode = DISABLE;
+        //FTS_INFO("pzp Charger is offline, disabling charger mode");
+    }
+
+    // Execute fts_ex_mode_switch only if charger_mode or glove_mode has changed
+    if (ts_data->charger_mode != ts_data->last_charger_mode) {
+        ts_data->last_charger_mode = ts_data->charger_mode;  // Update the last charger mode
+      //  ts_data->last_glove_mode = ts_data->glove_mode;
+        if (!ts_data->suspended&&ts_data->charger_notify_wq != NULL) {
+            queue_work(ts_data->charger_notify_wq, &ts_data->charger_work);
+        }
+    }
+
+    power_supply_put(psy);  // Release power supply object
+    return 0;
+}
+
+static int fts_charger_notifier_callback_init(struct fts_ts_data *ts_data)
+{
+    int ret = 0;
+    FTS_FUNC_ENTER();
+    mutex_init(&ts_data->ts_data_lock);  // Initialize the mutex
+    // Initialize charger mode related variables
+    ts_data->last_charger_mode = DISABLE;
+    ts_data->last_glove_mode = DISABLE;
+    ts_data->prev_glove_mode = DISABLE;
+    ts_data->glove_mode_restored = false;
+
+    ts_data->notifier_charger.notifier_call = fts_charger_notifier_callback;
+    ret = power_supply_reg_notifier(&ts_data->notifier_charger);
+    if (ret < 0) {
+        FTS_ERROR("power_supply_reg_notifier failed\n");
+    }
+
+    ts_data->charger_notify_wq = create_singlethread_workqueue("fts_charger_wq");
+    if (!ts_data->charger_notify_wq) {
+        FTS_ERROR("Failed to create workqueue\n");
+        return -ENOMEM;
+    }
+
+    INIT_WORK(&ts_data->charger_work, fts_update_charger);
+   
+
+    FTS_FUNC_EXIT();
+    return ret;
+}
+
+static int fts_charger_notifier_callback_exit(struct fts_ts_data *ts_data)
+{
+    FTS_FUNC_ENTER();
+    power_supply_unreg_notifier(&ts_data->notifier_charger);
+    FTS_ERROR("Unregistering ts_data->notifier_charger.\n");
+    FTS_FUNC_EXIT();
+    return 0;
+}
+#endif
+//drv-modify by shenwenbin for TP charger mode 20240304 end
 
 #if FTS_PEN_EN
 static int fts_input_pen_init(struct fts_ts_data *ts_data)
@@ -1998,7 +2168,11 @@ static int fts_ts_resume(struct device *dev)
 #endif
     fts_ex_mode_recovery(ts_data);
     fts_esdcheck_resume(ts_data);
-
+	 /* drv added by pzp, touch data reporting contrl, start */
+#if IS_ENABLED(CONFIG_PRIZE_UNDERWATER_TOUCH_CONTROL)
+	underwater_report_status = true;
+#endif
+	 /* drv added by pzp, touch data reporting contrl, end */
     if (ts_data->need_work_in_suspend) {
         if (disable_irq_wake(ts_data->irq)) {
             FTS_ERROR("disable_irq_wake(irq:%d) fail", ts_data->irq);
@@ -2006,6 +2180,8 @@ static int fts_ts_resume(struct device *dev)
     } else {
         fts_irq_enable();
     }
+
+    ts_data->suspended = false;	//drv-modify by shenwenbin for TP charger mode 20240304 
 
     FTS_FUNC_EXIT();
     return 0;
@@ -2260,6 +2436,14 @@ int fts_ts_probe_entry(struct fts_ts_data *ts_data)
     if (ret) {
         FTS_ERROR("init notifier callback fail");
     }
+//drv-modify by shenwenbin for TP charger mode 20240304 start
+#if FTS_CHARGER_MODE_EN
+    ret = fts_charger_notifier_callback_init(ts_data);
+    if (ret<0) {
+        FTS_ERROR("init notifier callback fail");
+    }
+#endif
+//drv-modify by shenwenbin for TP charger mode 20240304 end
 
     FTS_FUNC_EXIT();
     return 0;
@@ -2340,6 +2524,13 @@ int fts_ts_remove_entry(struct fts_ts_data *ts_data)
 #if FTS_PEN_EN
     input_unregister_device(ts_data->pen_dev);
 #endif
+
+//drv-modify by shenwenbin for TP charger mode 20240304 start
+#if FTS_CHARGER_MODE_EN
+	fts_charger_notifier_callback_exit(ts_data);
+#endif
+//drv-modify by shenwenbin for TP charger mode 20240304 end
+
     if (ts_data->ts_workqueue) destroy_workqueue(ts_data->ts_workqueue);
     if (gpio_is_valid(ts_data->pdata->reset_gpio))
         gpio_free(ts_data->pdata->reset_gpio);

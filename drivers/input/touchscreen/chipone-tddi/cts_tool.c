@@ -106,7 +106,7 @@ static u32 cts_tool_direct_access_addr = 0;
 
 static int cts_tool_open(struct inode *inode, struct file *file)
 {
-    file->private_data = PDE_DATA(inode);
+	file->private_data = PDE_DATA(inode); //PDE_DATA(inode);
     return 0;
 }
 

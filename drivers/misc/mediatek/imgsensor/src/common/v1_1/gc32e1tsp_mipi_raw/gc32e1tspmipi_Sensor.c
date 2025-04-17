@@ -252,7 +252,7 @@ static struct SENSOR_WINSIZE_INFO_STRUCT imgsensor_winsize_info[5] = {
 #if GC32E1TSP_REMOSAIC_ENABLE
 
 #define SXTC_SIZE 771
-#define SXTC_ADDR 0xFB1
+#define SXTC_ADDR 0xFAF
 #define MAX_READ_WRITE_SIZE 255
 #define EEPROM_SLAVE_ID 0xA4
 static kal_uint8 sxtc[SXTC_SIZE] = {0};

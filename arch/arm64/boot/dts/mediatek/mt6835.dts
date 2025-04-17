@@ -4760,7 +4760,7 @@
 				min-brightness = <24>;
 				max-hw-brightness = <2047>;
 				/* prize liuyong, modify boot up backlight, 20231205, start*/
-				default-brightness = <245>;
+				default-brightness = <1638>;
 				/* prize liuyong, modify boot up backlight, 20231205, end*/
 			};
 		};

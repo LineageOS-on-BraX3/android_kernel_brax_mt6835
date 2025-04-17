@@ -46,4 +46,9 @@ source "drivers/input/fingerprint/goodix-gw9518/Kconfig"
 source "drivers/input/fingerprint/microarray_v4_0_0_1/Kconfig"
 # drv add goodix fingerprint end
 
+#prize-add ata test node 20240927 by dengbinggui 20240927 start
+source "drivers/input/fingerprint/pri_finger_ftm_node/Kconfig"
+#prize-add ata test node 20240927 by dengbinggui 20240927 end
+
+
 endmenu

@@ -1519,7 +1519,69 @@ struct IMGSENSOR_HW_POWER_SEQ sensor_power_sequence[] = {
 			},
 		},
 #endif
+#if defined(GC02M1MACRO_MIPI_RAW)
+	{
+		SENSOR_DRVNAME_GC02M1MACRO_MIPI_RAW,
+		{
+			{RST, Vol_Low, 1},
+			{PDN, Vol_Low, 1},
+			{DOVDD, Vol_1800, 1},
+			{AVDD, Vol_2800, 0},
+			//{DVDD, Vol_1200, 0},
+			{SensorMCLK, Vol_High, 1},
+			{RST, Vol_High, 2},
+			{PDN, Vol_High, 2}
+		},
+	},
+#endif
 /*prize add by zhuzhengjiang for camera end*/
+#if defined(IMX550_MIPI_RAW)
+	{
+		SENSOR_DRVNAME_IMX550_MIPI_RAW,
+		{
+			{PDN, Vol_Low, 0},
+			{RST, Vol_Low, 3},
+			{DOVDD, Vol_1800, 0},
+			{AVDD, Vol_2800, 0},
+			{DVDD, Vol_1200, 0},
+			{AFVDD, Vol_2800, 1},
+			{SensorMCLK, Vol_High, 0},
+			{PDN, Vol_High, 0},
+			{RST, Vol_High, 5},
+		},
+	},
+#endif
+#if defined(IMX682GMS_MIPI_RAW)
+	{
+		SENSOR_DRVNAME_IMX682GMS_MIPI_RAW,
+		{
+			{RST, Vol_Low, 1},
+			{AVDD, Vol_2900, 0},
+			{PDN, Vol_High, 0},
+			{AFVDD, Vol_2800, 1},
+			{DVDD, Vol_1100, 0},
+			{DOVDD, Vol_1800, 1},
+			{SensorMCLK, Vol_High, 1},
+			{RST, Vol_High, 1}
+		},
+	},
+#endif
+#if defined(S5K3P8SPGMS_MIPI_RAW)
+	{
+		SENSOR_DRVNAME_S5K3P8SPGMS_MIPI_RAW,
+		{
+			{SensorMCLK, Vol_High, 0},
+			{DOVDD, Vol_1800, 0},
+			{AVDD, Vol_2800, 0},
+			{DVDD, Vol_1000, 0},
+			{AFVDD, Vol_2800, 5},
+			{PDN, Vol_Low, 4},
+			{PDN, Vol_High, 0},
+			{RST, Vol_Low, 1},
+			{RST, Vol_High, 0},
+		},
+	},
+#endif
 	/* add new sensor before this line */
 	{NULL,},
 };

@@ -54,13 +54,19 @@ extern struct hardware_info current_lcm_info;
 
 /*drv-add gesture function-shenwenbin-20240509-start */
 //#include "../../../misc/mediatek/prize/prize_common_node/prize_common_node.h"
-extern unsigned int tp_gesture_flag;
+//extern unsigned int tp_gesture_flag;
 /*drv-add gesture function-shenwenbin-20240509-end */
 
 //drv-mod by shenwenbin for bias bringup 20240410 start
 #include "mtk_drm_gateic.h"
 extern int mtk_panel_i2c_write_bytes(unsigned char addr, unsigned char value);
 //drv-mod by shenwenbin for bias bringup 20240410 end
+
+//drv Added the double-click wake up function-pzp-20240817-start
+#if IS_ENABLED(CONFIG_PRIZE_COMMON_NODE)
+#include "../../../input/touchscreen/focaltech_ft8057s_v4_1/focaltech_common.h"
+#endif
+//drv Added the double-click wake up function-pzp-20240817-end
 
 struct lcm {
 	struct device *dev;
@@ -655,12 +661,18 @@ static int lcm_unprepare(struct drm_panel *panel)
 
 	ctx->error = 0;
 	ctx->prepared = false;
-
-#if 1
+//drv-hide by yubo for 20240911 start
+/*
     if (tp_gesture_flag){
        	return 0;
     }
-
+	*/
+//drv-hide by yubo for 20240911 end
+//drv Added the double-click wake up function-pzp-20240817-start
+#if IS_ENABLED(CONFIG_PRIZE_COMMON_NODE)
+	if(!fts_gesture_status())
+	{
+#endif	
 	ctx->reset_gpio =
 		devm_gpiod_get(ctx->dev, "reset", GPIOD_OUT_HIGH);
 	if (IS_ERR(ctx->reset_gpio)) {
@@ -668,7 +680,7 @@ static int lcm_unprepare(struct drm_panel *panel)
 			__func__, PTR_ERR(ctx->reset_gpio));
 		return PTR_ERR(ctx->reset_gpio);
 	}
-	gpiod_set_value(ctx->reset_gpio, 0);
+	gpiod_set_value(ctx->reset_gpio, 1);
 	devm_gpiod_put(ctx->dev, ctx->reset_gpio);
 
 	ctx->bias_neg = devm_gpiod_get_index(ctx->dev,
@@ -693,7 +705,10 @@ static int lcm_unprepare(struct drm_panel *panel)
 	gpiod_set_value(ctx->bias_pos, 0);
 	devm_gpiod_put(ctx->dev, ctx->bias_pos);
     udelay(8000);
+#if IS_ENABLED(CONFIG_PRIZE_COMMON_NODE)
+	}
 #endif
+//drv Added the double-click wake up function-pzp-20240817-end
 
 	return 0;
 }
@@ -820,6 +835,7 @@ static struct mtk_panel_params ext_params_90 = {
 	},
 	//.lfr_enable = 1,
 	//.lfr_minimum_fps = 60,
+    .lcm_index = 1, //drv-mod by shenwenbin for compatible with two panel PQ 20240902
 };
 static struct mtk_panel_params ext_params_60 = {
 	//.vfp_low_power = 2540,//60hz
@@ -838,6 +854,7 @@ static struct mtk_panel_params ext_params_60 = {
 	},
 	//.lfr_enable = 1,
 	//.lfr_minimum_fps = 60,
+    .lcm_index = 1, //drv-mod by shenwenbin for compatible with two panel PQ 20240902
 };
 
 static struct drm_display_mode *get_mode_by_id(struct drm_connector *connector,

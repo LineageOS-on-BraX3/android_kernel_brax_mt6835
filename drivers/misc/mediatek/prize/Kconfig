@@ -33,13 +33,20 @@ config PRIZE_HARDWARE_LPDDR_INFO
 	  hardware lpddr info. If configures to be n, means devices doesn't support
 	  hardware lpddr info functionality.
 #DRV added by chenjiaxi, add lpddr 8802 info (for ufs kernel-5.10), end
-
+# drv added by pzp, touch data reporting contrl, start
+config PRIZE_UNDERWATER_TOUCH_CONTROL
+	tristate "UNDERWATER_TOUCH"
+  default n
+  help
+    Prize Underwater camera not report touch point
+# drv added by pzp, touch data reporting contrl, end	
 config PRIZE_COMMON_NODE
 	tristate "common node"
 	default n
 	help
 	  common_node. If configures to be n, means devices doesn't support
 	  common_node functionality.
+source "drivers/misc/mediatek/prize/prize_common_node/Kconfig"
 
 #add by driver for pixel_manager 20231124 start
 config PRIZE_PIXEL_MANAGER
@@ -145,4 +152,10 @@ config PRIZE_SIM_STATE
 	default n
 	help
 	  prize_sim_state. If configures to be n, means devices doesn't support
-	  prize_sim_state functionality.	  
+	  prize_sim_state functionality.	
+
+config DRV_ZKWBD_EN
+	tristate "zkwbeidou_en Driver"
+	default n
+	help
+	  DRV_ZKWBD_EN.	  

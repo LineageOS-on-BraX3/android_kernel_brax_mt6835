@@ -13,7 +13,7 @@
 
 /** 1: hwid register addr 0x70000
  *  2: Use spi drw protocol */
-#define CONFIG_CTS_ICTYPE_ICNL9922C 
+#define CONFIG_CTS_ICTYPE_ICNL9922C
 
 /** Feature: hwid register addr 0x70000 */
 /* #define CONFIG_CTS_ICTYPE_ICNL9951 */
@@ -24,7 +24,6 @@
 /** Whether reset pin is used */
 #define CFG_CTS_HAS_RESET_PIN
 
-#define CONFIG_CTS_SPI_HOST
 /* #define CONFIG_CTS_I2C_HOST */
 #ifndef CONFIG_CTS_I2C_HOST
 #ifndef CFG_CTS_HAS_RESET_PIN
@@ -34,7 +33,7 @@
 #define CFG_CTS_SPI_SPEED_KHZ               6000
 #endif /* CONFIG_CTS_I2C_HOST */
 
-#define CFG_CTS_FORCE_UP 
+/* #define CFG_CTS_FORCE_UP */
 /* #define CFG_CTS_HEARTBEAT_MECHANISM */
 
 /* #define CFG_CTS_PALM_DETECT */
@@ -64,8 +63,8 @@
 #define CFG_CTS_FW_FILE_NAME_VENDOR         "chipone"
 #endif /*CFG_CTS_FW_UPDATE_FILE_LOAD */
 
-#define CFG_CTS_FIRMWARE_FILENAME           "chipone_firmware.bin"
-#define CFG_CTS_FIRMWARE_FILEPATH           "/vendor/firmware/chipone_firmware.bin"
+#define CFG_CTS_FIRMWARE_FILENAME           "E051_WCL_BOE_6.95_ICNL9922C_H144_0x0107_20240722.bin"
+#define CFG_CTS_FIRMWARE_FILEPATH           "/vendor/firmware/E051_WCL_BOE_6.95_ICNL9922C_H144_0x0107_20240722.bin"
 #endif /* CFG_CTS_FIRMWARE_IN_FS */
 
 #define CFG_CTS_FACTORY_LIMIT_FILENAME      "chipone_limit.bin"
@@ -118,7 +117,7 @@
     { GESTURE_C, KEY_C,},               \
     { GESTURE_W, KEY_W,},               \
     { GESTURE_V, KEY_V,},               \
-    { GESTURE_D_TAP, KEY_POWER,},          \
+    { GESTURE_D_TAP, KEY_F1,},          \
     { GESTURE_Z, KEY_Z,},               \
     { GESTURE_M, KEY_M,},               \
     { GESTURE_O, KEY_O,},               \
@@ -134,13 +133,13 @@
 #endif /* CFG_CTS_GESTURE */
 
 /* #define CONFIG_CTS_GLOVE */
-//#define CONFIG_CTS_EARJACK_DETECT
-//#define CONFIG_CTS_CHARGER_DETECT
+// #define CONFIG_CTS_EARJACK_DETECT
+// #define CONFIG_CTS_CHARGER_DETECT
 
 /* #define CONFIG_CTS_TP_PROXIMITY */
 
 /* ESD protection */
-//#define CONFIG_CTS_ESD_PROTECTION
+#define CONFIG_CTS_ESD_PROTECTION
 #ifdef CONFIG_CTS_ESD_PROTECTION
 #define CFG_CTS_ESD_PROTECTION_CHECK_PERIOD   (2 * HZ)
 #define CFG_CTS_ESD_FAILED_CONFIRM_CNT        3
@@ -158,61 +157,72 @@
 #define CFG_CTS_UPDATE_CRCCHECK
 
 
-#define CONFIG_MTK_PLATFORM 1
 /****************************************************************************
  * Platform configurations
  ****************************************************************************/
-#ifdef CONFIG_MTK_I2C_EXTENSION
-#define TPD_SUPPORT_I2C_DMA
-#define CFG_CTS_MAX_I2C_XFER_SIZE           (250)
-#define CFG_CTS_MAX_I2C_FIFO_XFER_SIZE      (8)
-#else
-#define CFG_CTS_MAX_I2C_XFER_SIZE           (128)
-#endif /* CONFIG_MTK_I2C_EXTENSION */
+#define CONFIG_CTS_PM_FB_NOTIFIER
 
+#ifdef CONFIG_CTS_PM_FB_NOTIFIER
+#ifdef CONFIG_DRM
+//drv add by chenjiaxi, support mtk drm mediatek v2 notifier, begin
+#ifdef CONFIG_DRM_MEDIATEK_V2
+#define CFG_CTS_DRM_MEDIATEK_V2_NOTIFIER
+#else
+#define CFG_CTS_DRM_NOTIFIER
+#endif /*CONFIG_DRM_MEDIATEK_V2 */
+//drv add by chenjiaxi, support mtk drm mediatek v2 notifier, end
+#endif /*CONFIG_DRM */
+#else /*CONFIG_CTS_PM_FB_NOTIFIER */
+#if defined(CONFIG_PM_SLEEP) && defined(CONFIG_PM_SUSPEND)
+    /* #define CONFIG_CTS_PM_GENERIC */
+#endif /* CONFIG_PM_SLEEP */
+
+#ifndef CONFIG_CTS_PM_GENERIC
+#define CONFIG_CTS_PM_LEGACY
+#endif /*CONFIG_CTS_PM_GENERIC */
+#endif /*CONFIG_CTS_PM_FB_NOTIFIER */
+
+#define CFG_CTS_MAX_I2C_XFER_SIZE           (48u)
 #define CFG_CTS_MAX_I2C_READ_SIZE           (2048u)
 #define CFG_CTS_MAX_SPI_XFER_SIZE           (8192u)
 #define CFG_CTS_INT_DATA_MAX_SIZE           (8192u)
 
+
 #define CTS_FW_LOG_REDIRECT_SIGN            0x60
 #define CTS_FW_LOG_BUF_LEN                  128
 
-//#define CFG_MTK_LEGEND_PLATFORM
+/**
+ * #define CFG_CTS_SWAP_XY
+ * #define CFG_CTS_WRAP_X
+ * #define CFG_CTS_WRAP_Y
+ */
 
-/* Swap X and Y cordinate */
-//#define CFG_CTS_SWAP_XY
-
-#ifdef CONFIG_MTK_LCM_PHYSICAL_ROTATION_HW
-#ifdef CONFIG_TOUCHSCREEN_PHYSICAL_ROTATION_WITH_LCM
-//#define CFG_CTS_WRAP_X
-//#define CFG_CTS_WRAP_Y
-#else   /* CONFIG_TOUCHSCREEN_PHYSICAL_ROTATION_WITH_LCM */
-//#define CFG_CTS_WRAP_X
-//#define CFG_CTS_WRAP_Y
-#endif  /* CONFIG_TOUCHSCREEN_PHYSICAL_ROTATION_WITH_LCM */
-#else   /* CONFIG_MTK_LCM_PHYSICAL_ROTATION_HW */
-#ifdef CONFIG_TOUCHSCREEN_PHYSICAL_ROTATION_WITH_LCM
-//#define CFG_CTS_WRAP_X
-//#define CFG_CTS_WRAP_Y
-#else   /* CONFIG_TOUCHSCREEN_PHYSICAL_ROTATION_WITH_LCM */
-//#define CFG_CTS_WRAP_X
-//#define CFG_CTS_WRAP_Y
-#endif  /* CONFIG_TOUCHSCREEN_PHYSICAL_ROTATION_WITH_LCM */
-#endif  /* CONFIG_MTK_LCM_PHYSICAL_ROTATION_HW */
-
-#define CFG_CTS_DEVICE_NAME         TPD_DEVICE
-#define CFG_CTS_DRIVER_NAME         "chipone-tddi"
-
-#ifdef CONFIG_OF
-#define CONFIG_CTS_OF
-#endif
-#ifdef CONFIG_CTS_OF
-#define CFG_CTS_OF_DEVICE_ID_NAME   "chipone-tddi"
-#endif /* CONFIG_CTS_OF */
+#define CFG_CTS_DEVICE_NAME                 "chipone-tddi"
+#define CFG_CTS_DRIVER_NAME                 "chipone-tddi"
 
 #if CFG_CTS_MAX_I2C_XFER_SIZE < 8
 #error "I2C transfer size should large than 8"
 #endif
 
+#ifdef CONFIG_OF
+#define CONFIG_CTS_OF
+#endif
+#ifdef CONFIG_CTS_OF
+#define CFG_CTS_OF_DEVICE_ID_NAME           "chipone-tddi"
+
+#define CFG_CTS_OF_INT_GPIO_NAME            "chipone,irq-gpio"
+#define CFG_CTS_OF_RST_GPIO_NAME            "chipone,rst-gpio"
+
+#ifdef CFG_CTS_MANUAL_CS
+#define CFG_CTS_OF_CS_GPIO_NAME             "chipone,cs-gpio"
+#endif
+
+#define CFG_CTS_OF_X_RESOLUTION_NAME        "chipone,x-res"
+#define CFG_CTS_OF_Y_RESOLUTION_NAME        "chipone,y-res"
+
+#ifdef CFG_CTS_FW_UPDATE_SYS
+#define CFG_CTS_OF_PANEL_SUPPLIER           "chipone,panel-supplier"
+#endif
+#endif /* CONFIG_CTS_OF */
 
 #endif /* CTS_CONFIG_H */

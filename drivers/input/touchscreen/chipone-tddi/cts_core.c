@@ -11,11 +11,11 @@
 #include "cts_earjack_detect.h"
 #include "cts_tcs.h"
 
-//drv add by yubo for hardware_info 20240416 start
+//drv added by chenjiaxi, hardware_info, begin
 #if IS_ENABLED(CONFIG_PRIZE_HARDWARE_INFO)
 #include "../../../misc/mediatek/prize/hardware_info/hardware_info.h"
 #endif
-//drv add by yubo for hardware_info 20240416 end
+//drv added by chenjiaxi, hardware_info, end
 
 #ifdef CONFIG_CTS_I2C_HOST
 static int cts_i2c_writeb(const struct cts_device *cts_dev,
@@ -1364,17 +1364,16 @@ static int cts_init_fwdata(struct cts_device *cts_dev)
             cts_err("calc_int_data_size failed: %d", ret);
             return -EINVAL;
         }
-	}
-//drv add by yubo for hardware_info 20240416 start
+    }
+//drv added by chenjiaxi, hardware_info, begin
 #if IS_ENABLED(CONFIG_PRIZE_HARDWARE_INFO)
-	snprintf(current_tp_info.chip,sizeof(current_tp_info.chip),"%s, Fwver:%04x",cts_dev->hwdata->name,cts_dev->fwdata.version);
-	sprintf(current_tp_info.id,"hwid: %08x fwid: %04x", cts_dev->hwdata->hwid,cts_dev->hwdata->fwid);
-	strcpy(current_tp_info.vendor,"CHIPONE");
-	snprintf(current_tp_info.more,sizeof(current_tp_info.more),"%d*%d\n ddi_version:%02x",
-			cts_dev->fwdata.res_x+1, cts_dev->fwdata.res_y+1,cts_dev->fwdata.ddi_version);
+    snprintf(current_tp_info.chip, sizeof(current_tp_info.chip), "%s, Fwver:%04x", cts_dev->hwdata->name, cts_dev->fwdata.version);
+    sprintf(current_tp_info.id, "hwid: %08x fwid: %04x", cts_dev->hwdata->hwid, cts_dev->hwdata->fwid);
+    strcpy(current_tp_info.vendor, "chipone");
+    snprintf(current_tp_info.more, sizeof(current_tp_info.more), "%d*%d\n ddi_version:%02x",
+        cts_dev->fwdata.res_x+1, cts_dev->fwdata.res_y+1, cts_dev->fwdata.ddi_version);
 #endif
-//drv add by yubo for hardware_info 20240416 end
-
+//drv added by chenjiaxi, hardware_info, end
 
     cts_err("fwver: %04x", fwdata->version);
     cts_err("libver: %04x", fwdata->lib_version);
@@ -1453,7 +1452,9 @@ static void cts_handle_proximity_event(bool status)
 int cts_irq_handler(struct cts_device *cts_dev)
 {
     struct cts_device_touch_info *touch_info;
+#ifdef CFG_CTS_GESTURE
     u8 pwrmode = 3;
+#endif
     int ret;
 
     cts_dbg("Enter IRQ handler");
@@ -2100,7 +2101,7 @@ bool cts_is_fwid_valid(u16 fwid)
             return true;
     }
 
-    return false;
+    return true;
 }
 
 static bool cts_is_hwid_valid(u32 hwid)
@@ -2171,7 +2172,9 @@ int cts_probe_device(struct cts_device *cts_dev)
     cts_init_rtdata_with_normal_mode(cts_dev);
     if (!cts_plat_is_normal_mode(cts_dev->pdata)) {
         cts_warn("Normal mode spi addr is offline");
-    } else {
+    } 
+/*
+else {
         ret = cts_tcs_get_fw_id(cts_dev, &fwid);
         if (ret) {
             cts_err("Get firmware id failed %d", ret);
@@ -2187,7 +2190,7 @@ int cts_probe_device(struct cts_device *cts_dev)
             goto init_hwdata;
         }
     }
-
+*/
 read_hwid:
     ret = cts_get_hwid(cts_dev, &hwid);
     if (ret || hwid == CTS_DEV_HWID_INVALID) {
@@ -2202,7 +2205,7 @@ read_hwid:
             return -ENODEV;
     }
 
-init_hwdata:
+//init_hwdata:
     ret = cts_init_device_hwdata(cts_dev, hwid, fwid);
     if (ret) {
         cts_err("Device hwid: %06x fwid: %04x not found", hwid, fwid);

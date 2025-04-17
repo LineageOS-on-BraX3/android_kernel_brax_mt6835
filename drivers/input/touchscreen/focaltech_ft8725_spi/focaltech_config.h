@@ -229,7 +229,7 @@
  * show debug log info
  * enable it for debug, disable it for release
  */
-#define FTS_DEBUG_EN                            1
+#define FTS_DEBUG_EN                            0
 
 /*
  * Linux MultiTouch Protocol
@@ -306,6 +306,10 @@
 #define FTS_MULTI_FW_NUM                        0
 
 /*
+ * charger mode
+ */
+#define FTS_CHARGER_MODE_EN                    1
+/*
  * auto upgrade for lcd cfg
  */
 #define FTS_AUTO_LIC_UPGRADE_EN                 0
@@ -343,19 +347,19 @@
  * define your own fw_file, the sample one to be replaced is invalid
  * NOTE: if FTS_GET_MODULE_NUM > 1, it's the fw corresponding with FTS_MODULE_ID
  */
-#define FTS_UPGRADE_FW_FILE                     "include/firmware/FT8725_BOE_6P58_V05_D00_20240812_app.i"
+#define FTS_UPGRADE_FW_FILE                     "include/firmware/FT8725_BOE_6P58_V0e_D00_20241022_app.i"
 
 /*
  * if FTS_GET_MODULE_NUM >= 2, fw corrsponding with FTS_MODULE2_ID
  * define your own fw_file, the sample one is invalid
  */
-#define FTS_UPGRADE_FW2_FILE                    "include/firmware/FT8725_BOE_6P58_V05_D00_20240812_app.i"
+#define FTS_UPGRADE_FW2_FILE                    "include/firmware/FT8725_BOE_6P58_V0e_D00_20241022_app.i"
 
 /*
  * if FTS_GET_MODULE_NUM >= 3, fw corrsponding with FTS_MODULE3_ID
  * define your own fw_file, the sample one is invalid
  */
-#define FTS_UPGRADE_FW3_FILE                    "include/firmware/FT8725_BOE_6P58_V05_D00_20240812_app.i"
+#define FTS_UPGRADE_FW3_FILE                    "include/firmware/FT8725_BOE_6P58_V0e_D00_20241022_app.i"
 
 /*********************************************************/
 

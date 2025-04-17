@@ -1,13 +1,10 @@
-char Cust_emmc_support[][50]={
-{"PT : SMVUM17XZZBD91SLSM-UT_LA"},
-{"UC : KM8F9001JM_B813_UC"},
-{"NU : H9QT1G6DN6X132"},
-{"LB : SMVUM17YZZCD91SKSM_UT"},
-{"NW : H9QT0G6CN6X146"},
-{"UU : KM8L9001JM_B624"},
-{"WB : MT29VZZZCD91SKSM_046_W17Y"},
-{"SQ : H9QT0GECN6X145_SQ"},
-{"LA : SMVUM17XZZBD91SLSM-UT_LA"},
-{"NR : KM2L9001CM_B518_NR"},
-{"SZ : KM8V9001JM_B813_SZ"},
+char Cust_emmc_support[][50]={     /* idx in qvl_list */
+{"RT : RS1G32LX4D4BNR-53BT"},      /* 8 */
+{"RH : RS1536M32LB4D4BDT-53BT"},   /* 9 */
+{"UY : K4UJE3D4AA_MGCL"},          /* 10 */
+{"GH : FLXC4006G-20"},             /* 11 */
+{"W3 : MT53E1536M32DDNQ_046_WTA"}, /* 12 */
+{"RL : RS1G32LO4D2BDS-53BT"},      /* 13 */
+{"FB : FLXC2004G-N1"},             /* 14 */
+{"U3 : K4UBE3D4AB_MGCL"},          /* 15 */
 };

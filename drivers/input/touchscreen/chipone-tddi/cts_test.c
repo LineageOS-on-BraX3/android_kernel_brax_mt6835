@@ -1767,11 +1767,11 @@ try_again:
 
     /* Short between rows */
     cts_info("Test short between rows");
-        ret = cts_tcs_set_short_test_type(cts_dev, CTS_SHORT_TEST_BETWEEN_ROWS);
-        if (ret) {
-            cts_err("Set short test type to BETWEEN_ROWS failed %d", ret);
-            goto recovery_display_state;
-        }
+    ret = cts_tcs_set_short_test_type(cts_dev, CTS_SHORT_TEST_BETWEEN_ROWS);
+    if (ret) {
+        cts_err("Set short test type to BETWEEN_ROWS failed %d", ret);
+        goto recovery_display_state;
+    }
 
 	for (loopcnt = 0; loopcnt < SHORT_ROWS_TEST_LOOP; loopcnt++) {
         ret = cts_tcs_polling_test_data(cts_dev, (u8 *)test_result,

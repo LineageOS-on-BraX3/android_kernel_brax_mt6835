@@ -48,3 +48,6 @@ obj-$(CONFIG_PRIZE_CAMPING_LIGHT) += camping_light/
 obj-$(CONFIG_DRV_FLASH_LIGHT) += flash_light/
 #Driv: add for LAK-131 jinzhao 20240223
 obj-$(CONFIG_PRIZE_SIM_STATE) += prize_sim_state/
+#drv added by yaozhipeng, zkw beidou power enable, 20240918-start
+obj-$(CONFIG_DRV_ZKWBD_EN) += beidou/
+#drv added by yaozhipeng, zkw beidou power enable, 20240918-end

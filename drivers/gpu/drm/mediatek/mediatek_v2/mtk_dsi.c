@@ -10669,6 +10669,10 @@ int mtk_dsi_get_vendor_id(void)
 	{
 		lcmVendorId = 2;
 	}
+	else if (!strcmp(g_lcm_vendor_name,"panel-huashi-ili9883-vdo"))
+	{
+		lcmVendorId = 1;
+	}
 
 	return lcmVendorId;
 }

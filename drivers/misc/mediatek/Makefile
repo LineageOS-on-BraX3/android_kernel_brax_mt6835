@@ -8,9 +8,6 @@ obj-$(CONFIG_MTK_CCCI_DEVICES)	+=  ccci_util/
 obj-$(CONFIG_MTK_NET_CCMNI) +=  ccmni/
 obj-$(CONFIG_MTK_NET_RPS) += rps/
 obj-$(CONFIG_NFC_CHIP_SUPPORT) += nfc/
-#drv add by yaozhipeng 20230921 start
-obj-$(CONFIG_TMS_CHIP_SUPPORT) += nfc_tms/
-#drv add by yaozhipeng 20230921 end
 obj-$(CONFIG_MTK_ECCCI_DRIVER) +=  eccci/
 obj-$(CONFIG_MTK_MEMORY_BLOCK) += memblock/
 obj-$(CONFIG_MTK_PID_MAP) += pidmap/
@@ -110,3 +107,5 @@ obj-$(CONFIG_MTK_MT6382_BDG) += spi_slave_drv/
 #drv add by wangwei1 20230510 start
 obj-$(CONFIG_LCD_BIAS) += lcd_bias/
 #drv add by wangwei1 20230510 end
+# pri add nfc
+obj-$(CONFIG_SEC_NFC)		+= samsung/

@@ -2210,6 +2210,19 @@ static ssize_t compensate_cap_show(struct device *dev,
 static DEVICE_ATTR(compensate_cap, S_IRUGO, compensate_cap_show, NULL);
 
 #ifdef CFG_CTS_HAS_RESET_PIN
+static ssize_t reset_pin_show(struct device *dev,
+                  struct device_attribute *attr, char *buf)
+{
+    struct chipone_ts_data *cts_data = dev_get_drvdata(dev);
+
+    cts_info("Read RESET-PIN");
+
+    return snprintf(buf, PAGE_SIZE,
+            "Reset pin: %d, status: %d\n",
+            cts_data->pdata->rst_gpio,
+            gpio_get_value(cts_data->pdata->rst_gpio));
+}
+
 static ssize_t reset_pin_store(struct device *dev,
         struct device_attribute *attr, const char *buf, size_t count)
 {
@@ -2223,9 +2236,24 @@ static ssize_t reset_pin_store(struct device *dev,
     return count;
 }
 
-static DEVICE_ATTR(reset_pin, S_IWUSR, NULL, reset_pin_store);
+static DEVICE_ATTR(reset_pin, S_IRUSR | S_IWUSR, reset_pin_show,
+        reset_pin_store);
 #endif
 
+static ssize_t irq_pin_show(struct device *dev,
+        struct device_attribute *attr, char *buf)
+{
+    struct chipone_ts_data *cts_data = dev_get_drvdata(dev);
+
+    cts_info("Read IRQ-PIN");
+
+    return snprintf(buf, PAGE_SIZE,
+            "IRQ pin: %d, status: %d\n",
+            cts_data->pdata->int_gpio,
+            gpio_get_value(cts_data->pdata->int_gpio));
+}
+
+static DEVICE_ATTR(irq_pin, S_IRUGO, irq_pin_show, NULL);
 
 static ssize_t irq_info_show(struct device *dev,
         struct device_attribute *attr, char *buf)
@@ -2959,6 +2987,7 @@ static struct attribute *cts_dev_misc_atts[] = {
 #ifdef CFG_CTS_HAS_RESET_PIN
     &dev_attr_reset_pin.attr,
 #endif
+    &dev_attr_irq_pin.attr,
     &dev_attr_irq_info.attr,
 #ifdef CFG_CTS_FW_LOG_REDIRECT
     &dev_attr_fw_log_redirect.attr,
@@ -3005,13 +3034,13 @@ static const struct attribute_group *cts_dev_attr_groups[] = {
     NULL
 };
 
-extern struct chipone_ts_data *chipone_ts_data;
+extern struct chipone_ts_data *g_cts_data;
 extern int cts_suspend(struct chipone_ts_data *cts_data);
 extern int cts_resume(struct chipone_ts_data *cts_data);
 static ssize_t cts_suspend_show(struct device *dev,
         struct device_attribute *attr, char *buf)
 {
-    struct chipone_ts_data *cts_data = chipone_ts_data;
+    struct chipone_ts_data *cts_data = g_cts_data;
     struct cts_device *cts_dev = &cts_data->cts_dev;
     return  snprintf(buf, PAGE_SIZE,  "%s\n",
             cts_dev->rtdata.suspended ? "suspend" : "resume");
@@ -3021,9 +3050,9 @@ static ssize_t cts_suspend_store(struct device *dev,
 {
     if (count >= 1) {
         if (buf[0] == '1') {
-            cts_suspend(chipone_ts_data);
+            cts_suspend(g_cts_data);
         } else if (buf[0] == '0') {
-            cts_resume(chipone_ts_data);
+            cts_resume(g_cts_data);
         } else {
             cts_err("usage: echo 0/1 > ts_suspend");
         }
@@ -3051,8 +3080,6 @@ static struct attribute_group ts_suspend_attr_group = {
 static ssize_t path_show(struct device *dev,
         struct device_attribute *attr, char *buf)
 {
-//modify by kuangluiangjun for GKI start--20240314
-#ifndef CFG_CTS_FOR_GKI
     struct chipone_ts_data *data = dev_get_drvdata(dev);
     ssize_t blen;
     const char *path;
@@ -3061,20 +3088,14 @@ static ssize_t path_show(struct device *dev,
         cts_err("Read 'path' with chipone_ts_data NULL");
         return (ssize_t) 0;
     }
-
 #ifdef CONFIG_CTS_I2C_HOST
     path = kobject_get_path(&data->i2c_client->dev.kobj, GFP_KERNEL);
 #else
     path = kobject_get_path(&data->spi_client->dev.kobj, GFP_KERNEL);
 #endif
-
     blen = scnprintf(buf, PAGE_SIZE, "%s", path ? path : "na");
     kfree(path);
     return blen;
-#else
-	return 0;
-#endif
-//modify by kuangluiangjun for GKI end--20240314
 }
 
 /* Attribute: vendor (RO) */
@@ -3206,33 +3227,6 @@ device_destroy:
 
     return -ENODEV;
 }
-
-/*prize add by KLJ for gesture start*/
-struct chipone_ts_data *g_cts_data = NULL;
-extern int g_tp_gesture_flag;
-extern void prize_common_node_register(char* name,void(*set)(unsigned char on_off));
-static void cts_double_type_func(unsigned char on)
-{
-	
-	if(1 == on){
-		cts_enable_gesture_wakeup(&g_cts_data->cts_dev);
-		g_tp_gesture_flag = 1;
-		printk("%s enter DOUBLE-TAP gesture\n", __func__);
-	}else if(0 == on){
-		cts_disable_gesture_wakeup(&g_cts_data->cts_dev);
-		g_tp_gesture_flag = 0;
-		printk("%s close DOUBLE-TAP gesture\n", __func__);
-	}
-	
-}
-
-void gesture_init(void)
-{
-			
-	prize_common_node_register("GESTURE", &cts_double_type_func);
-
-}
-/*prize add by KLJ for gesture end*/
 
 int cts_sysfs_add_device(struct device *dev)
 {

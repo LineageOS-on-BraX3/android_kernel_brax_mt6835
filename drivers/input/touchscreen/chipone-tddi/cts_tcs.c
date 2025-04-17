@@ -266,7 +266,7 @@ static int cts_tcs_spi_xtrans(const struct cts_device *cts_dev, u8 *tx,
     int ret;
 
     memset(&xfer[0], 0, sizeof(struct spi_transfer));
-    //xfer[0].delay_usecs = 0;
+    //xfer[0].delay_usecs = 0; //drv deleted by chenjiaxi, there is no delay_usecs member in spi_transfer
     xfer[0].speed_hz = cts_dev->pdata->spi_speed * 1000u;
     xfer[0].tx_buf = tx;
     xfer[0].rx_buf = NULL;
@@ -288,7 +288,7 @@ static int cts_tcs_spi_xtrans(const struct cts_device *cts_dev, u8 *tx,
     udelay(100);
 
     memset(&xfer[1], 0, sizeof(struct spi_transfer));
-    //xfer[1].delay_usecs = 0;
+    //xfer[1].delay_usecs = 0; //drv deleted by chenjiaxi, there is no delay_usecs member in spi_transfer
     xfer[1].speed_hz = cts_dev->pdata->spi_speed * 1000u;
     xfer[1].tx_buf = NULL;
     xfer[1].rx_buf = rx;
@@ -338,7 +338,7 @@ static int cts_tcs_spi_xtrans_1_cs(const struct cts_device *cts_dev, u8 *tx,
     int ret;
 
     memset(&xfer[0], 0, sizeof(struct spi_transfer));
-    //xfer[0].delay_usecs = 0;
+    //xfer[0].delay_usecs = 0; //drv deleted by chenjiaxi, there is no delay_usecs member in spi_transfer
     xfer[0].speed_hz = cts_dev->pdata->spi_speed * 1000u;
     xfer[0].tx_buf = tx;
     xfer[0].rx_buf = rx;

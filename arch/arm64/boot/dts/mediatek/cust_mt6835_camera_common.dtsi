@@ -577,7 +577,7 @@
 
 	cam0_enable_sensor = "s5k3l8_mipi_raw ov50c40_mipi_raw";
 	cam1_enable_sensor = "gc05a2sub_mipi_raw";
-	cam2_enable_sensor = "";
+	cam2_enable_sensor = "bf2257csmacro_mipi_raw";
 	cam3_enable_sensor = "";
 
 	status = "okay";

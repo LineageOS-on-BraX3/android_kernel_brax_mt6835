@@ -104,6 +104,7 @@ obj-$(CONFIG_DRM_PANEL_NT37801_CMD_FHD) += panel-nt37801-cmd-fhd.o
 obj-$(CONFIG_DRM_PANEL_NT37801_CMD_SPR) += panel-nt37801-cmd-spr.o
 obj-$(CONFIG_DRM_PANEL_HUIKE_ILI9883_DSI_VDO) += panel-huike-ili9883-vdo.o
 obj-$(CONFIG_DRM_PANEL_HUAYIN_FT8057S_DSI_VDO) += panel-huayin-ft8057s-vdo.o
+obj-$(CONFIG_DRM_PANEL_HUASHI_ILI9883_DSI_VDO) += panel-huashi-ili9883-vdo.o
 ifneq ($(wildcard $(srctree)/$(src)/k6985v1_64),)
 obj-$(CONFIG_DRM_TD2204_WQHD_AMB678ZY01_S6E3HC3_CMD) += k6985v1_64/td2204-wqhd-amb678zy01-s6e3hc3-cmd.o
 endif

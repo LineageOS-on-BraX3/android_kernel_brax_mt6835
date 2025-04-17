@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: GPL-2.0
 #define LOG_TAG         "Plat"
 
 #include "cts_config.h"
@@ -7,9 +6,6 @@
 #include "cts_firmware.h"
 #include "cts_sysfs.h"
 #include "cts_tcs.h"
-
-int tpd_rst_gpio_index = 0;
-int tpd_int_gpio_index = 1;
 
 #ifdef CFG_CTS_FW_LOG_REDIRECT
 size_t cts_plat_get_max_fw_log_size(struct cts_platform_data *pdata)
@@ -23,28 +19,15 @@ u8 *cts_plat_get_fw_log_buf(struct cts_platform_data *pdata, size_t size)
 }
 #endif
 
-#ifdef CONFIG_CTS_I2C_HOST
 size_t cts_plat_get_max_i2c_xfer_size(struct cts_platform_data *pdata)
 {
-#ifdef TPD_SUPPORT_I2C_DMA
-    if (pdata->i2c_dma_available) {
-        return CFG_CTS_MAX_I2C_XFER_SIZE;
-    } else {
-        return CFG_CTS_MAX_I2C_FIFO_XFER_SIZE;
-    }
-#else /* TPD_SUPPORT_I2C_DMA */
     return CFG_CTS_MAX_I2C_XFER_SIZE;
-#endif /* TPD_SUPPORT_I2C_DMA */
 }
 
+#ifdef CONFIG_CTS_I2C_HOST
 u8 *cts_plat_get_i2c_xfer_buf(struct cts_platform_data *pdata, size_t xfer_size)
 {
-#ifdef TPD_SUPPORT_I2C_DMA
-    if (pdata->i2c_dma_available && xfer_size > CFG_CTS_MAX_I2C_FIFO_XFER_SIZE) {
-        return pdata->i2c_dma_buff_va;
-    } else
-#endif /* TPD_SUPPORT_I2C_DMA */
-        return pdata->i2c_fifo_buf;
+    return pdata->i2c_fifo_buf;
 }
 
 int cts_plat_i2c_write(struct cts_platform_data *pdata, u8 i2c_addr,
@@ -52,30 +35,12 @@ int cts_plat_i2c_write(struct cts_platform_data *pdata, u8 i2c_addr,
 {
     int ret = 0, retries = 0;
 
-#ifdef TPD_SUPPORT_I2C_DMA
     struct i2c_msg msg = {
-        .addr    = i2c_addr,
-        .flags    = !I2C_M_RD,
-        .len    = len,
-        .timing = 300,
-    };
-
-    if (pdata->i2c_dma_available && len > CFG_CTS_MAX_I2C_FIFO_XFER_SIZE) {
-        msg.ext_flag = (pdata->i2c_client->ext_flag | I2C_ENEXT_FLAG | I2C_DMA_FLAG);
-        msg.buf = (u8 *)pdata->i2c_dma_buff_pa;
-        memcpy(pdata->i2c_dma_buff_va, src, len);
-    } else {
-        msg.buf = (u8 *)src;
-    }
-    msg.len  = len;
-#else
-    struct i2c_msg msg = {
-        .flags = !I2C_M_RD,
+        .flags = 0,
         .addr = i2c_addr,
         .buf = (u8 *) src,
         .len = len,
     };
-#endif /* TPD_SUPPORT_I2C_DMA */
 
     do {
         ret = i2c_transfer(pdata->i2c_client->adapter, &msg, 1);
@@ -99,43 +64,20 @@ int cts_plat_i2c_read(struct cts_platform_data *pdata, u8 i2c_addr,
 {
     int num_msg, ret = 0, retries = 0;
 
-#ifdef TPD_SUPPORT_I2C_DMA
     struct i2c_msg msgs[2] = {
         {
-            .addr    = i2c_addr,
-            .flags    = !I2C_M_RD,
-            .len    = wlen,
-            .buf    = (u8 *)wbuf,
-            .timing = 300,
+            .addr = i2c_addr,
+            .flags = 0,
+            .buf = (u8 *) wbuf,
+            .len = wlen
         },
         {
-            .addr      = i2c_addr,
-            .flags      = I2C_M_RD,
-            .len      = rlen,
-            .timing   = 300,
-        },
+            .addr = i2c_addr,
+            .flags = I2C_M_RD,
+            .buf = (u8 *) rbuf,
+            .len = rlen
+        }
     };
-
-    if (pdata->i2c_dma_available && rlen > CFG_CTS_MAX_I2C_FIFO_XFER_SIZE) {
-        msgs[1].ext_flag = (pdata->i2c_client->ext_flag | I2C_ENEXT_FLAG | I2C_DMA_FLAG);
-        msgs[1].buf  = (u8 *)pdata->i2c_dma_buff_pa;
-    } else {
-        msgs[1].buf = (u8 *)rbuf;
-    }
-#else /* TPD_SUPPORT_I2C_DMA */
-    struct i2c_msg msgs[2] = {
-        {
-         .addr = i2c_addr,
-         .flags = !I2C_M_RD,
-         .buf = (u8 *) wbuf,
-         .len = wlen },
-        {
-         .addr = i2c_addr,
-         .flags = I2C_M_RD,
-         .buf = (u8 *) rbuf,
-         .len = rlen }
-    };
-#endif /* TPD_SUPPORT_I2C_DMA */
 
     if (wbuf == NULL || wlen == 0)
         num_msg = 1;
@@ -153,22 +95,13 @@ int cts_plat_i2c_read(struct cts_platform_data *pdata, u8 i2c_addr,
             if (delay)
                 mdelay(delay);
             continue;
-        } else {
-#ifdef TPD_SUPPORT_I2C_DMA
-        if (pdata->i2c_dma_available && rlen > CFG_CTS_MAX_I2C_FIFO_XFER_SIZE) {
-            memcpy(rbuf, pdata->i2c_dma_buff_va, rlen);
-        }
-#endif /* TPD_SUPPORT_I2C_DMA */
-
+        } else
             return 0;
-        }
     } while (++retries < retry);
 
     return ret;
 }
-#endif
-
-#ifdef CONFIG_CTS_SPI_HOST
+#else
 void dump_spi_common(const char *prefix, u8 *data, size_t datalen)
 {
     u8 str[1024];
@@ -182,137 +115,13 @@ void dump_spi_common(const char *prefix, u8 *data, size_t datalen)
     cts_err("%s", str);
 }
 
-#ifdef CFG_MTK_LEGEND_PLATFORM
-struct mt_chip_conf cts_spi_conf_mt65xx = {
-    .setuptime = 15,
-    .holdtime = 15,
-    .high_time = 21, //for mt6582, 104000khz/(4+4) = 130000khz
-    .low_time = 21,
-    .cs_idletime = 20,
-    .ulthgh_thrsh = 0,
-
-    .cpol = 0,
-    .cpha = 0,
-
-    .rx_mlsb = 1,
-    .tx_mlsb = 1,
-
-    .tx_endian = 0,
-    .rx_endian = 0,
-
-    .com_mod = FIFO_TRANSFER,
-    .pause = 1,
-    .finish_intr = 1,
-    .deassert = 0,
-    .ulthigh = 0,
-    .tckdly = 0,
-};
-
-typedef enum {
-    SPEED_500KHZ = 500,
-    SPEED_1MHZ = 1000,
-    SPEED_2MHZ = 2000,
-    SPEED_3MHZ = 3000,
-    SPEED_4MHZ = 4000,
-    SPEED_6MHZ = 6000,
-    SPEED_8MHZ = 8000,
-    SPEED_KEEP,
-    SPEED_UNSUPPORTED
-} SPI_SPEED;
-
-void cts_plat_spi_set_mode(struct spi_device *spi, SPI_SPEED speed, int flag)
-{
-    struct mt_chip_conf *mcc = &cts_spi_conf_mt65xx;
-    int ret;
-
-    if (flag == 0) {
-        mcc->com_mod = FIFO_TRANSFER;
-    } else {
-        mcc->com_mod = DMA_TRANSFER;
-    }
-
-    switch (speed) {
-    case SPEED_500KHZ:
-        mcc->high_time = 120;
-        mcc->low_time = 120;
-        break;
-    case SPEED_1MHZ:
-        mcc->high_time = 60;
-        mcc->low_time = 60;
-        break;
-    case SPEED_2MHZ:
-        mcc->high_time = 30;
-        mcc->low_time = 30;
-        break;
-    case SPEED_3MHZ:
-        mcc->high_time = 20;
-        mcc->low_time = 20;
-        break;
-    case SPEED_4MHZ:
-        mcc->high_time = 15;
-        mcc->low_time = 15;
-        break;
-    case SPEED_6MHZ:
-        mcc->high_time = 10;
-        mcc->low_time = 10;
-        break;
-    case SPEED_8MHZ:
-        mcc->high_time = 8;
-        mcc->low_time = 8;
-        break;
-    case SPEED_KEEP:
-    case SPEED_UNSUPPORTED:
-        break;
-    }
-
-    ret = spi_setup(spi);
-    if (ret) {
-        cts_err("Spi setup failed %d(%s)", ret, cts_strerror(ret));
-    }
-}
-
-int cts_plat_spi_setup(struct cts_platform_data *pdata)
-{
-    pdata->spi_client->mode = SPI_MODE_0;
-    pdata->spi_client->bits_per_word = 8;
-    pdata->spi_client->chip_select = 0;
-
-    cts_info(" - chip_select  :%d", pdata->spi_client->chip_select);
-    cts_info(" - spi_mode     :%d", pdata->spi_client->mode);
-    cts_info(" - bits_per_word:%d", pdata->spi_client->bits_per_word);
-
-    pdata->spi_client->controller_data = (void *)&cts_spi_conf_mt65xx;
-    spi_setup(pdata->spi_client);
-    cts_plat_spi_set_mode(pdata->spi_client, pdata->spi_speed, 0);
-    return 0;
-}
-#else
-int cts_plat_spi_setup(struct cts_platform_data *pdata)
-{
-    int ret;
-
-    pdata->spi_client->chip_select = 0;
-    pdata->spi_client->mode = SPI_MODE_0;
-    pdata->spi_client->bits_per_word = 8;
-
-    cts_info("chip_select  :%d", pdata->spi_client->chip_select);
-    cts_info("spi_mode     :%d", pdata->spi_client->mode);
-    cts_info("bits_per_word:%d", pdata->spi_client->bits_per_word);
-
-    ret = spi_setup(pdata->spi_client);
-    if (ret)
-        cts_err("spi_setup err!");
-    return 0;
-}
-#endif
-
 #ifdef CFG_CTS_MANUAL_CS
 int cts_plat_set_cs(struct cts_platform_data *pdata, int val)
 {
     if (val)
-        pinctrl_select_state(pdata->pinctrl1, pdata->spi_cs_high);
+        gpio_set_value(pdata->cs_gpio, 1);
     else
-        pinctrl_select_state(pdata->pinctrl1, pdata->spi_cs_low);
+        gpio_set_value(pdata->cs_gpio, 0);
 
     return 0;
 }
@@ -324,7 +133,7 @@ int cts_spi_send_recv(struct cts_platform_data *pdata, size_t len,
     struct chipone_ts_data *cts_data;
     struct spi_message msg;
     struct spi_transfer cmd = {
-        //.delay_usecs = 0,
+        //.delay_usecs = 0, //drv deleted by chenjiaxi, there is no delay_usecs member in spi_transfer
         .speed_hz = pdata->spi_speed * 1000u,
         .tx_buf = tx_buffer,
         .rx_buf = rx_buffer,
@@ -719,6 +528,86 @@ static void cts_plat_touch_dev_irq_work(struct work_struct *work)
 }
 #endif /* CONFIG_GENERIC_HARDIRQS */
 
+#ifdef CONFIG_CTS_OF
+static int cts_plat_parse_dt(struct cts_platform_data *pdata,
+        struct device_node *dev_node)
+{
+    int ret = 0;
+
+    cts_info("Parse device tree");
+
+    pdata->int_gpio = of_get_named_gpio(dev_node, CFG_CTS_OF_INT_GPIO_NAME, 0);
+    if (!gpio_is_valid(pdata->int_gpio)) {
+        cts_err("Parse INT GPIO from dt failed %d", pdata->int_gpio);
+        pdata->int_gpio = -1;
+    }
+    cts_info("  %-12s: %d", "int gpio", pdata->int_gpio);
+
+    pdata->irq = gpio_to_irq(pdata->int_gpio);
+    if (pdata->irq < 0) {
+        cts_err("Parse irq failed %d", ret);
+        return pdata->irq;
+    }
+    cts_info("  %-12s: %d", "irq num", pdata->irq);
+
+#ifdef CFG_CTS_HAS_RESET_PIN
+    pdata->rst_gpio = of_get_named_gpio(dev_node, CFG_CTS_OF_RST_GPIO_NAME, 0);
+    if (!gpio_is_valid(pdata->rst_gpio)) {
+        cts_err("Parse RST GPIO from dt failed %d", pdata->rst_gpio);
+        pdata->rst_gpio = -1;
+    }
+    cts_info("  %-12s: %d", "rst gpio", pdata->rst_gpio);
+#endif /* CFG_CTS_HAS_RESET_PIN */
+
+#ifdef CFG_CTS_MANUAL_CS
+    pdata->cs_gpio = of_get_named_gpio(dev_node, CFG_CTS_OF_CS_GPIO_NAME, 0);
+    if (!gpio_is_valid(pdata->cs_gpio)) {
+        cts_err("Parse CS GPIO from dt failed %d", pdata->cs_gpio);
+        pdata->cs_gpio = -1;
+    }
+    cts_info("  %-12s: %d", "cs gpio", pdata->cs_gpio);
+#endif
+
+    ret = of_property_read_u32(dev_node, CFG_CTS_OF_X_RESOLUTION_NAME,
+            &pdata->res_x);
+    if (ret)
+        cts_warn("Parse X resolution from dt failed %d", ret);
+
+    cts_info("  %-12s: %d", "X resolution", pdata->res_x);
+
+    ret = of_property_read_u32(dev_node, CFG_CTS_OF_Y_RESOLUTION_NAME,
+            &pdata->res_y);
+    if (ret)
+        cts_warn("Parse Y resolution from dt failed %d", ret);
+
+    cts_info("  %-12s: %d", "Y resolution", pdata->res_y);
+
+    if (of_property_read_u32(dev_node, "chipone,def-build-id", &pdata->build_id)) {
+        pdata->build_id = 0;
+        cts_info("chipone,build_id undefined.");
+    } else
+        cts_info("chipone,build_id=0x%04X", pdata->build_id);
+
+    if (of_property_read_u32(dev_node, "chipone,def-config-id", &pdata->config_id)) {
+        pdata->config_id = 0;
+        cts_info("chipone,config_id undefined.");
+    } else
+        cts_info("chipone,config_id=0x%04X", pdata->config_id);
+
+#ifdef CFG_CTS_FW_UPDATE_SYS
+    ret = of_property_read_string(dev_node, CFG_CTS_OF_PANEL_SUPPLIER,
+            &pdata->panel_supplier);
+    if (ret) {
+        pdata->panel_supplier = NULL;
+        cts_warn("read panel supplier failed, ret=%d", ret);
+    } else
+        cts_info("panel supplier=%s", (char *)pdata->panel_supplier);
+#endif
+
+    return 0;
+}
+#endif /* CONFIG_CTS_OF */
+
 #ifdef CFG_CTS_FORCE_UP
 static void cts_plat_touch_event_timeout_work(struct work_struct *work)
 {
@@ -731,32 +620,25 @@ static void cts_plat_touch_event_timeout_work(struct work_struct *work)
 }
 #endif
 
-#ifdef CONFIG_CTS_SPI_HOST
-static int cts_plat_init_dts(struct cts_platform_data *pdata, struct device *device)
+#ifndef CONFIG_CTS_I2C_HOST
+int cts_plat_spi_setup(struct cts_platform_data *pdata)
 {
-#ifdef CFG_CTS_MANUAL_CS
-    struct device_node *node;
+    int ret;
 
-    pdata->pinctrl1 = devm_pinctrl_get(device);
-    node = device->of_node;
-    if (node) {
-        pdata->spi_cs_low = pinctrl_lookup_state(pdata->pinctrl1, "spi_cs_low");
-        if (IS_ERR(pdata->spi_cs_low)) {
-            cts_err("Cannot find pinctrl spi cs high!\n");
-            return -ENOENT;
-        }
-        pdata->spi_cs_high = pinctrl_lookup_state(pdata->pinctrl1, "spi_cs_high");
-        if (IS_ERR(pdata->spi_cs_high)) {
-            return -ENOENT;
-        }
-        return 0;
-    }
-    return -ENOENT;
-#else
+    pdata->spi_client->chip_select = 0;
+    pdata->spi_client->mode = SPI_MODE_0;
+    pdata->spi_client->bits_per_word = 8;
+
+    cts_info("chip_select  :%d", pdata->spi_client->chip_select);
+    cts_info("spi_mode     :%d", pdata->spi_client->mode);
+    cts_info("bits_per_word:%d", pdata->spi_client->bits_per_word);
+
+    ret = spi_setup(pdata->spi_client);
+    if (ret)
+        cts_err("spi_setup err!");
     return 0;
-#endif
 }
-#endif /* CONFIG_CTS_SPI_HOST */
+#endif
 
 #ifdef CONFIG_CTS_I2C_HOST
 int cts_init_platform_data(struct cts_platform_data *pdata,
@@ -766,8 +648,8 @@ int cts_init_platform_data(struct cts_platform_data *pdata,
         struct spi_device *spi)
 #endif
 {
-    struct device_node *node = NULL;
-    u32 ints[2] = { 0, 0 };
+    struct input_dev *input_dev;
+    int ret = 0;
 
     cts_info("cts_init_platform_data Init");
 
@@ -780,103 +662,181 @@ int cts_init_platform_data(struct cts_platform_data *pdata,
 #else
         dev = &spi->dev;
 #endif /* CONFIG_CTS_I2C_HOST */
+        ret = cts_plat_parse_dt(pdata, dev->of_node);
+        if (ret) {
+            cts_err("Parse dt failed %d", ret);
+            return ret;
+        }
     }
 #endif /* CONFIG_CTS_OF */
 
 #ifdef CONFIG_CTS_I2C_HOST
     pdata->i2c_client = i2c_client;
+    pdata->i2c_client->irq = pdata->irq;
 #else
     pdata->spi_client = spi;
+    pdata->spi_client->irq = pdata->irq;
 #endif /* CONFIG_CTS_I2C_HOST */
 
-    pdata->ts_input_dev = tpd->dev;
-
-    spin_lock_init(&pdata->irq_lock);
     mutex_init(&pdata->dev_lock);
+    spin_lock_init(&pdata->irq_lock);
+
+    input_dev = input_allocate_device();
+    if (input_dev == NULL) {
+        cts_err("Failed to allocate input device.");
+        return -ENOMEM;
+    }
+
+    /** - Init input device */
+    input_dev->name = CFG_CTS_DEVICE_NAME;
+    input_dev->name = CFG_CTS_DEVICE_NAME;
+#ifdef CONFIG_CTS_I2C_HOST
+    input_dev->id.bustype = BUS_I2C;
+    input_dev->dev.parent = &pdata->i2c_client->dev;
+#else
+    input_dev->id.bustype = BUS_SPI;
+    input_dev->dev.parent = &pdata->spi_client->dev;
+#endif /* CONFIG_CTS_I2C_HOST */
+    input_dev->evbit[0] = BIT_MASK(EV_SYN) | BIT_MASK(EV_KEY) | BIT_MASK(EV_ABS);
+#ifdef CFG_CTS_PALM_DETECT
+    set_bit(CFG_CTS_PALM_EVENT, input_dev->keybit);
+#endif
+
+#ifdef CFG_CTS_SWAP_XY
+    input_set_abs_params(input_dev, ABS_MT_POSITION_X, 0, pdata->res_y, 0, 0);
+    input_set_abs_params(input_dev, ABS_MT_POSITION_Y, 0, pdata->res_x, 0, 0);
+#else /* CFG_CTS_SWAP_XY */
+    input_set_abs_params(input_dev, ABS_MT_POSITION_X, 0, pdata->res_x, 0, 0);
+    input_set_abs_params(input_dev, ABS_MT_POSITION_Y, 0, pdata->res_y, 0, 0);
+#endif /* CFG_CTS_SWAP_XY */
+
+    input_set_abs_params(input_dev, ABS_MT_PRESSURE, 0, 255, 0, 0);
+    input_set_abs_params(input_dev, ABS_MT_TOUCH_MAJOR, 0, 255, 0, 0);
+    input_set_abs_params(input_dev, ABS_MT_TRACKING_ID, 0,
+            CFG_CTS_MAX_TOUCH_NUM * 2, 0, 0);
+
+    input_set_capability(input_dev, EV_KEY, BTN_TOUCH);
+
+#ifdef CONFIG_CTS_SLOTPROTOCOL
+    input_mt_init_slots(input_dev, CFG_CTS_MAX_TOUCH_NUM, 0);
+#endif /* CONFIG_CTS_SLOTPROTOCOL */
+    __set_bit(INPUT_PROP_DIRECT, input_dev->propbit);
+    __set_bit(EV_ABS, input_dev->evbit);
+    input_set_drvdata(input_dev, pdata);
+    ret = input_register_device(input_dev);
+    if (ret) {
+        cts_err("Failed to register input device");
+        return ret;
+    }
+
+    pdata->ts_input_dev = input_dev;
 
 #if !defined(CONFIG_GENERIC_HARDIRQS)
     INIT_WORK(&pdata->ts_irq_work, cts_plat_touch_dev_irq_work);
 #endif /* CONFIG_GENERIC_HARDIRQS */
 
-    if ((node = of_find_matching_node(node, touch_of_match)) == NULL) {
-        cts_err("Find touch eint node failed");
-        return -ENODATA;
-    }
-    if (of_property_read_u32_array(node, "debounce", ints, ARRAY_SIZE(ints)) == 0) {
-        gpio_set_debounce(ints[0], ints[1]);
-    } else {
-        cts_info("Debounce time not found");
-    }
-    pdata->irq = irq_of_parse_and_map(node, 0);
-    if (pdata->irq == 0) {
-        cts_err("Parse irq in dts failed");
-        return -ENODEV;
-    }
-
 #ifdef CONFIG_CTS_VIRTUALKEY
-    pdata->vkey_num = tpd_dts_data.tpd_keycnt;
+    {
+        u8 vkey_keymap[CFG_CTS_NUM_VKEY] = CFG_CTS_VKEY_KEYCODES;
+
+        memcpy(pdata->vkey_keycodes, vkey_keymap, sizeof(vkey_keymap));
+        pdata->vkey_num = CFG_CTS_NUM_VKEY;
+    }
 #endif /* CONFIG_CTS_VIRTUALKEY */
 
 #ifdef CFG_CTS_GESTURE
     {
         u8 gesture_keymap[CFG_CTS_NUM_GESTURE][2] = CFG_CTS_GESTURE_KEYMAP;
+
         memcpy(pdata->gesture_keymap, gesture_keymap, sizeof(gesture_keymap));
         pdata->gesture_num = CFG_CTS_NUM_GESTURE;
     }
 #endif /* CFG_CTS_GESTURE */
 
-#ifdef TPD_SUPPORT_I2C_DMA
-        tpd->dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
-        pdata->i2c_dma_buff_va = (u8 *)dma_alloc_coherent(&tpd->dev->dev,
-                CFG_CTS_MAX_I2C_XFER_SIZE, &pdata->i2c_dma_buff_pa, GFP_KERNEL);
-        if (pdata->i2c_dma_buff_va == NULL) {
-            cts_err("Allocate I2C DMA Buffer failed!");
-            //return -ENOMEM;
-        } else {
-            pdata->i2c_dma_available = true;
-        }
-#endif /* TPD_SUPPORT_I2C_DMA */
-
 #ifdef CFG_CTS_FORCE_UP
     INIT_DELAYED_WORK(&pdata->touch_event_timeout_work,
-              cts_plat_touch_event_timeout_work);
+            cts_plat_touch_event_timeout_work);
 #endif
 
-#ifdef CONFIG_CTS_SPI_HOST
-    cts_plat_init_dts(pdata, &spi->dev);
+#ifndef CONFIG_CTS_I2C_HOST
     pdata->spi_speed = CFG_CTS_SPI_SPEED_KHZ;
     cts_plat_spi_setup(pdata);
 #endif
     return 0;
 }
 
+int cts_deinit_platform_data(struct cts_platform_data *pdata)
+{
+    cts_info("De-Init platform_data");
+    input_unregister_device(pdata->ts_input_dev);
+    return 0;
+}
+
 int cts_plat_request_resource(struct cts_platform_data *pdata)
 {
+    int ret;
+
     cts_info("Request resource");
 
-    tpd_gpio_as_int(tpd_int_gpio_index);
-    tpd_gpio_output(tpd_rst_gpio_index, 1);
+    ret = gpio_request_one(pdata->int_gpio, GPIOF_IN,
+            CFG_CTS_DEVICE_NAME "-int");
+    if (ret) {
+        cts_err("Request INT gpio (%d) failed %d", pdata->int_gpio, ret);
+        goto err_out;
+    }
+#ifdef CFG_CTS_HAS_RESET_PIN
+    ret = gpio_request_one(pdata->rst_gpio, GPIOF_OUT_INIT_HIGH,
+            CFG_CTS_DEVICE_NAME "-rst");
+    if (ret) {
+        cts_err("Request RST gpio (%d) failed %d", pdata->rst_gpio, ret);
+        goto err_free_int;
+    }
+#endif /* CFG_CTS_HAS_RESET_PIN */
+
+#ifdef CFG_CTS_MANUAL_CS
+    ret = gpio_request_one(pdata->cs_gpio, GPIOF_OUT_INIT_HIGH,
+            CFG_CTS_DEVICE_NAME "-cs");
+    if (ret) {
+        cts_err("Request CS gpio (%d) failed %d", pdata->cs_gpio, ret);
+        goto err_request_cs_gpio;
+    }
+#endif
 
     return 0;
+
+#ifdef CFG_CTS_MANUAL_CS
+err_request_cs_gpio:
+#endif
+
+#ifdef CONFIG_CTS_REGULATOR
+err_free_rst:
+#endif /* CONFIG_CTS_REGULATOR */
+#ifdef CFG_CTS_HAS_RESET_PIN
+    gpio_free(pdata->rst_gpio);
+err_free_int:
+#endif /* CFG_CTS_HAS_RESET_PIN */
+    gpio_free(pdata->int_gpio);
+err_out:
+    return ret;
 }
 
 void cts_plat_free_resource(struct cts_platform_data *pdata)
 {
     cts_info("Free resource");
 
-    /**
-     * Note:
-     *    If resource request without managed, should free all resource
-     *    requested in cts_plat_request_resource().
-     */
-#ifdef TPD_SUPPORT_I2C_DMA
-    if (pdata->i2c_dma_buff_va) {
-        dma_free_coherent(&tpd->dev->dev, CFG_CTS_MAX_I2C_XFER_SIZE,
-        pdata->i2c_dma_buff_va, pdata->i2c_dma_buff_pa);
-        pdata->i2c_dma_buff_va = NULL;
-        pdata->i2c_dma_buff_pa = 0;
-    }
-#endif /* TPD_SUPPORT_I2C_DMA */
+    if (gpio_is_valid(pdata->int_gpio))
+        gpio_free(pdata->int_gpio);
+
+#ifdef CFG_CTS_HAS_RESET_PIN
+    if (gpio_is_valid(pdata->rst_gpio))
+        gpio_free(pdata->rst_gpio);
+
+#endif /* CFG_CTS_HAS_RESET_PIN */
+#ifdef CFG_CTS_MANUAL_CS
+    if (gpio_is_valid(pdata->cs_gpio))
+        gpio_free(pdata->cs_gpio);
+
+#endif
 }
 
 int cts_plat_request_irq(struct cts_platform_data *pdata)
@@ -915,7 +875,7 @@ int cts_plat_enable_irq(struct cts_platform_data *pdata)
 
     if (pdata->irq > 0) {
         spin_lock_irqsave(&pdata->irq_lock, irqflags);
-        if (pdata->irq_is_disable) {    /* && !cts_is_device_suspended(pdata->chip)) */
+        if (pdata->irq_is_disable) {/* && !cts_is_device_suspended(pdata->chip)) */
             cts_dbg("Real enable IRQ");
             enable_irq(pdata->irq);
             pdata->irq_is_disable = false;
@@ -957,10 +917,12 @@ int cts_plat_reset_device(struct cts_platform_data *pdata)
     /* !!!can not be modified */
     cts_info("Reset device");
 
-    tpd_gpio_output(tpd_rst_gpio_index, 0);
+    gpio_set_value(pdata->rst_gpio, 1);
     mdelay(1);
-    tpd_gpio_output(tpd_rst_gpio_index, 1);
-    mdelay(50);
+    gpio_set_value(pdata->rst_gpio, 0);
+    mdelay(10);
+    gpio_set_value(pdata->rst_gpio, 1);
+    mdelay(40);
 
     return 0;
 }
@@ -969,9 +931,9 @@ int cts_plat_set_reset(struct cts_platform_data *pdata, int val)
 {
     cts_info("Set Reset to %s", val ? "HIGH" : "LOW");
     if (val)
-        tpd_gpio_output(tpd_rst_gpio_index, 1);
+        gpio_set_value(pdata->rst_gpio, 1);
     else
-        tpd_gpio_output(tpd_rst_gpio_index, 0);
+        gpio_set_value(pdata->rst_gpio, 0);
 
     return 0;
 }
@@ -979,8 +941,7 @@ int cts_plat_set_reset(struct cts_platform_data *pdata, int val)
 
 int cts_plat_get_int_pin(struct cts_platform_data *pdata)
 {
-    /* MTK platform can not get INT pin value */
-    return -ENOTSUPP;
+    return gpio_get_value(pdata->int_gpio);
 }
 
 int cts_plat_power_up_device(struct cts_platform_data *pdata)
@@ -1000,9 +961,6 @@ int cts_plat_power_down_device(struct cts_platform_data *pdata)
 int cts_plat_init_touch_device(struct cts_platform_data *pdata)
 {
     cts_info("Init touch device");
-
-    return input_mt_init_slots(pdata->ts_input_dev,
-        tpd_dts_data.touch_max_num, INPUT_MT_DIRECT);
 
     return 0;
 }
@@ -1028,7 +986,6 @@ void cts_report_palm_event(struct cts_platform_data *pdata)
 }
 #endif
 
-static int tpd_history_x, tpd_history_y;
 int cts_plat_process_touch_msg(struct cts_platform_data *pdata,
         struct cts_device_touch_msg *msgs, int num)
 {
@@ -1058,39 +1015,27 @@ int cts_plat_process_touch_msg(struct cts_platform_data *pdata,
         swap(x, y);
 #endif /* CFG_CTS_SWAP_XY */
 #ifdef CFG_CTS_WRAP_X
-        x = wrap(TPD_RES_X, x);
+        x = wrap(pdata->res_x, x);
 #endif /* CFG_CTS_WRAP_X */
 #ifdef CFG_CTS_WRAP_Y
-        y = wrap(TPD_RES_Y, y);
+        y = wrap(pdata->res_y, y);
 #endif /* CFG_CTS_WRAP_Y */
         cts_dbg("  Process touch msg[%d]: id[%u] ev=%u x=%u y=%u p=%u",
             i, msgs[i].id, msgs[i].event, x, y, msgs[i].pressure);
-
-#ifdef CONFIG_CTS_SLOTPROTOCOL
-        if (msgs[i].event == CTS_DEVICE_TOUCH_EVENT_DOWN ||
-            msgs[i].event == CTS_DEVICE_TOUCH_EVENT_MOVE ||
-            msgs[i].event == CTS_DEVICE_TOUCH_EVENT_STAY) {
+        if (msgs[i].event == CTS_DEVICE_TOUCH_EVENT_DOWN
+        || msgs[i].event == CTS_DEVICE_TOUCH_EVENT_MOVE
+        || msgs[i].event == CTS_DEVICE_TOUCH_EVENT_STAY) {
             if (msgs[i].id < CFG_CTS_MAX_TOUCH_NUM)
                 finger_current[msgs[i].id] = 1;
         }
-        input_mt_slot(input_dev, msgs[i].id);
-
+#ifdef CONFIG_CTS_SLOTPROTOCOL
+        /* input_mt_slot(input_dev, msgs[i].id); */
         switch (msgs[i].event) {
         case CTS_DEVICE_TOUCH_EVENT_DOWN:
-            TPD_DEBUG_SET_TIME;
-            TPD_EM_PRINT(x, y, x, y, msgs[i].id, 1);
-            tpd_history_x = x;
-            tpd_history_y = y;
-#ifdef CONFIG_MTK_BOOT
-            if (tpd_dts_data.use_tpd_button) {
-                if (FACTORY_BOOT == get_boot_mode() ||
-                    RECOVERY_BOOT == get_boot_mode())
-                    tpd_button(x, y, 1);
-            }
-#endif /* CONFIG_MTK_BOOT */
         case CTS_DEVICE_TOUCH_EVENT_MOVE:
         case CTS_DEVICE_TOUCH_EVENT_STAY:
             contact++;
+            input_mt_slot(input_dev, msgs[i].id);
             input_mt_report_slot_state(input_dev, MT_TOOL_FINGER, true);
             input_report_abs(input_dev, ABS_MT_POSITION_X, x);
             input_report_abs(input_dev, ABS_MT_POSITION_Y, y);
@@ -1099,35 +1044,22 @@ int cts_plat_process_touch_msg(struct cts_platform_data *pdata,
             break;
 
         case CTS_DEVICE_TOUCH_EVENT_UP:
-            TPD_DEBUG_SET_TIME;
-            TPD_EM_PRINT(tpd_history_x, tpd_history_y, tpd_history_x, tpd_history_y, msgs[i].id, 0);
-            tpd_history_x = 0;
-            tpd_history_y = 0;
-#ifdef CONFIG_MTK_BOOT
-            if (tpd_dts_data.use_tpd_button) {
-                if (FACTORY_BOOT == get_boot_mode() ||
-                    RECOVERY_BOOT == get_boot_mode())
-                    tpd_button(0, 0, 0);
-            }
-#endif /* CONFIG_MTK_BOOT */
-            //input_report_key(input_dev, BTN_TOUCH, 0);
-            //input_mt_report_slot_state(input_dev, MT_TOOL_FINGER, false);
+            /* input_mt_report_slot_state(input_dev, MT_TOOL_FINGER, false); */
             break;
 
         default:
-            cts_warn
-                ("Process touch msg with unknwon event %u id %u",
-                 msgs[i].event, msgs[i].id);
+            cts_warn("Process touch msg with unknwon event %u id %u",
+                    msgs[i].event, msgs[i].id);
             break;
         }
 #else /* CONFIG_CTS_SLOTPROTOCOL */
     /**
-     * If the driver reports one of BTN_TOUCH or ABS_PRESSURE
-     * in addition to the ABS_MT events, the last SYN_MT_REPORT event
-     * may be omitted. Otherwise, the last SYN_REPORT will be dropped
-     * by the input core, resulting in no zero-contact event
-     * reaching userland.
-     */
+    * If the driver reports one of BTN_TOUCH or ABS_PRESSURE
+    * in addition to the ABS_MT events, the last SYN_MT_REPORT event
+    * may be omitted. Otherwise, the last SYN_REPORT will be dropped
+    * by the input core, resulting in no zero-contact event
+    * reaching userland.
+    */
         switch (msgs[i].event) {
         case CTS_DEVICE_TOUCH_EVENT_DOWN:
         case CTS_DEVICE_TOUCH_EVENT_MOVE:
@@ -1145,7 +1077,7 @@ int cts_plat_process_touch_msg(struct cts_platform_data *pdata,
             break;
         default:
             cts_warn("Process touch msg with unknwon event %u id %u",
-                 msgs[i].event, msgs[i].id);
+                    msgs[i].event, msgs[i].id);
             break;
         }
 #endif /* CONFIG_CTS_SLOTPROTOCOL */
@@ -1167,7 +1099,6 @@ int cts_plat_process_touch_msg(struct cts_platform_data *pdata,
     }
 #endif
     input_sync(input_dev);
-
 #ifdef CFG_CTS_FORCE_UP
     if (contact) {
         if (delayed_work_pending(&pdata->touch_event_timeout_work)) {
@@ -1225,16 +1156,15 @@ int cts_plat_release_all_touch(struct cts_platform_data *pdata)
 #ifdef CONFIG_CTS_VIRTUALKEY
 int cts_plat_init_vkey_device(struct cts_platform_data *pdata)
 {
-    pdata->vkey_state = 0;
+    int i;
 
     cts_info("Init VKey");
 
-    if (tpd_dts_data.use_tpd_button) {
-        cts_info("Init vkey");
+    pdata->vkey_state = 0;
 
-        pdata->vkey_state = 0;
-        tpd_button_setting(tpd_dts_data.tpd_key_num, tpd_dts_data.tpd_key_local,
-                tpd_dts_data.tpd_key_dim_local);
+    for (i = 0; i < pdata->vkey_num; i++) {
+        input_set_capability(pdata->ts_input_dev,
+                EV_KEY, pdata->vkey_keycodes[i]);
     }
 
     return 0;
@@ -1257,12 +1187,8 @@ int cts_plat_process_vkey(struct cts_platform_data *pdata, u8 vkey_state)
     cts_dbg("Process vkey state=0x%02x, event=0x%02x", vkey_state, event);
 
     for (i = 0; i < pdata->vkey_num; i++) {
-        if (event & BIT(i)) {
-            tpd_button(x, y, vkey_state & BIT(i));
-
-            /* MTK fobidon more than one key pressed in the same time */
-            break;
-        }
+        input_report_key(pdata->ts_input_dev, pdata->vkey_keycodes[i],
+                vkey_state & BIT(i) ? 1 : 0);
     }
 
     pdata->vkey_state = vkey_state;
@@ -1278,7 +1204,7 @@ int cts_plat_release_all_vkey(struct cts_platform_data *pdata)
 
     for (i = 0; i < pdata->vkey_num; i++) {
         if (pdata->vkey_state & BIT(i)) {
-            tpd_button(x, y, 0);
+            input_report_key(pdata->ts_input_dev, pdata->vkey_keycodes[i], 0);
         }
     }
 

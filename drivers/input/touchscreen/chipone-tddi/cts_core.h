@@ -2,11 +2,6 @@
 #define CTS_CORE_H
 
 #include "cts_config.h"
-/* prize added by KLJ, prize disp notifier function, 20240423-start */
-#if IS_ENABLED(CONFIG_DRM_MEDIATEK)
-#include "mtk_disp_notify.h"
-#endif
-/* prize added by KLJ, prize disp notifier function, 20240423-end */
 
 enum cts_dev_hw_reg {
 #if defined(CONFIG_CTS_ICTYPE_ICNL9922C) ||\
@@ -430,37 +425,37 @@ struct chipone_ts_data {
 #ifdef CONFIG_CTS_LEGACY_TOOL
     struct proc_dir_entry *procfs_entry;
 #endif
-/* prize added by KLJ, prize disp notifier function, 20240423-start */
-#if IS_ENABLED(CONFIG_DRM_MEDIATEK)
-	struct notifier_block disp_notifier;
-#endif
-/* prize added by KLJ, prize disp notifier function, 20240423-end */
+
     void *oem_data;
 
     bool force_reflash;
     struct kobject *suspend_kobj;
 };
 
-//static inline u32 get_unaligned_le24(const void *p)
-//{
-//    const u8 *puc = (const u8 *)p;
-//    return (puc[0] | (puc[1] << 8) | (puc[2] << 16));
-//}
-//
-//static inline u32 get_unaligned_be24(const void *p)
-//{
-//    const u8 *puc = (const u8 *)p;
-//    return (puc[2] | (puc[1] << 8) | (puc[0] << 16));
-//}
-//
-//static inline void put_unaligned_be24(u32 v, void *p)
-//{
-//    u8 *puc = (u8 *) p;
-//
-//    puc[0] = (v >> 16) & 0xFF;
-//    puc[1] = (v >> 8) & 0xFF;
-//    puc[2] = (v >> 0) & 0xFF;
-//}
+/* drv deleted by chenjiaxi, this is already defined in #include <asm/unaligned.h>, begin */
+#if 0
+static inline u32 get_unaligned_le24(const void *p)
+{
+    const u8 *puc = (const u8 *)p;
+    return (puc[0] | (puc[1] << 8) | (puc[2] << 16));
+}
+
+static inline u32 get_unaligned_be24(const void *p)
+{
+    const u8 *puc = (const u8 *)p;
+    return (puc[2] | (puc[1] << 8) | (puc[0] << 16));
+}
+
+static inline void put_unaligned_be24(u32 v, void *p)
+{
+    u8 *puc = (u8 *) p;
+
+    puc[0] = (v >> 16) & 0xFF;
+    puc[1] = (v >> 8) & 0xFF;
+    puc[2] = (v >> 0) & 0xFF;
+}
+#endif
+/* drv deleted by chenjiaxi, this is already defined in #include <asm/unaligned.h>, end */
 
 #define wrap(max, x)        ((max) - 1 - (x))
 
@@ -753,8 +748,6 @@ extern void cts_enable_gesture_wakeup(struct cts_device *cts_dev);
 extern void cts_disable_gesture_wakeup(struct cts_device *cts_dev);
 extern bool cts_is_gesture_wakeup_enabled(const struct cts_device *cts_dev);
 extern int cts_get_gesture_info(struct cts_device *cts_dev, void *gesture_info);
-extern struct chipone_ts_data *g_cts_data;
-extern void gesture_init(void);
 #endif /* CFG_CTS_GESTURE */
 
 extern int cts_set_int_data_types(struct cts_device *cts_dev, u16 types);

@@ -69,7 +69,10 @@
 #include <linux/timekeeping.h>
 #endif
 #include "focaltech_common.h"
-
+//drv-modify by shenwenbin for TP charger mode 20240304 start
+#include <linux/power_supply.h>
+#include <linux/property.h>
+//drv-modify by shenwenbin for TP charger mode 20240304 end
 /*****************************************************************************
 * Private constant and macro definitions using #define
 *****************************************************************************/
@@ -133,7 +136,7 @@
 /*
  * For commnication error in PM(deep sleep) state
  */
-#define FTS_PATCH_COMERR_PM                 0
+#define FTS_PATCH_COMERR_PM                 1  //drv To solve deep hibernation, double-click the wake-up function requires 4 clicks to wake up-20240903
 #define FTS_TIMEOUT_COMERR_PM               700
 
 /*
@@ -250,6 +253,19 @@ struct fts_ts_data {
     bool glove_mode;
     bool cover_mode;
     bool charger_mode;
+    //drv-modify by shenwenbin for TP charger mode 20240304 start
+#if FTS_CHARGER_MODE_EN
+    struct notifier_block notifier_charger;
+    struct workqueue_struct *charger_notify_wq;
+    struct work_struct charger_work;
+    int last_charger_mode;
+    int last_glove_mode;
+    int prev_glove_mode;
+    bool glove_mode_restored;
+    union power_supply_propval online;
+    struct mutex ts_data_lock;  // 定义互斥锁
+#endif
+//drv-modify by shenwenbin for TP charger mode 20240304 end
     bool earphone_mode;
     bool edgepalm_mode;
     bool touch_analysis_support;
@@ -333,8 +349,18 @@ enum _FTS_FW_MODE {
     FW_MODE_FACTORY = 0x55,
     FW_MODE_GESTURE = 0x66,
 };
-
-
+//drv-modify by shenwenbin for TP charger mode 20240304 start
+/*****************************************************************************
+* 3.Private enumerations, structures and unions using typedef
+*****************************************************************************/
+enum _ex_mode {
+    MODE_GLOVE = 0,
+    MODE_COVER,
+    MODE_CHARGER,
+    MODE_EARPHONE,
+    MODE_EDGEPALM
+};
+//drv-modify by shenwenbin for TP charger mode 20240304 end
 /*****************************************************************************
 * Global variable or extern global variabls/functions
 *****************************************************************************/
@@ -416,7 +442,7 @@ int fts_input_report_buffer(struct fts_ts_data *ts_data, u8 *touch_buf);
 
 void fts_irq_disable(void);
 void fts_irq_enable(void);
-
+int fts_ex_mode_switch(enum _ex_mode mode, int value);//drv-modify by shenwenbin for TP charger mode 20240304
 #if FTS_PSENSOR_EN
 int fts_proximity_init(struct fts_ts_data *ts_data);
 int fts_proximity_exit(struct fts_ts_data *ts_data);

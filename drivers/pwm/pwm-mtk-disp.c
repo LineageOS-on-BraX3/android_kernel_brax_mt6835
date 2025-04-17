@@ -116,7 +116,7 @@ static int mtk_disp_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 	 * period = (PWM_CLK_RATE * period_ns) / (10^9 * (clk_div + 1)) - 1
 	 * high_width = (PWM_CLK_RATE * duty_ns) / (10^9 * (clk_div + 1))
 	 */
-	pr_notice("%s duty_cycle[%llu] period[%llu]\n", __func__, state->duty_cycle, state->period);
+	//pr_notice("%s duty_cycle[%llu] period[%llu]\n", __func__, state->duty_cycle, state->period);//drv close prink-20240905
 	rate = clk_get_rate(mdp->clk_main);
 	clk_div = mul_u64_u64_div_u64(state->period, rate, NSEC_PER_SEC) >>
 			  PWM_PERIOD_BIT_WIDTH;
@@ -136,8 +136,8 @@ static int mtk_disp_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 	high_width = mul_u64_u64_div_u64(state->duty_cycle, rate, div);
 	value = period | (high_width << PWM_HIGH_WIDTH_SHIFT);
 
-	pr_notice("%s rate[%llx] clk_div[%u] div[%llx] high_width[%u] value[%u] period[%u]",
-		__func__, rate, clk_div, div, high_width, value, period);
+	//pr_notice("%s rate[%llx] clk_div[%u] div[%llx] high_width[%u] value[%u] period[%u]",
+	//	__func__, rate, clk_div, div, high_width, value, period);//drv close prink-20240905
 
 	if (mdp->data->bls_debug && !mdp->data->has_commit) {
 		/*

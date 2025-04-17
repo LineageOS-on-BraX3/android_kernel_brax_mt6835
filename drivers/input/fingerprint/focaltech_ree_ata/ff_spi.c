@@ -424,6 +424,12 @@ static uint32_t ff_spi_get_clk_hz(struct spi_device *spi)
 }
 #endif
 
+//prize add by dengbinggui for ata node 20240927 start
+#ifdef CONFIG_PRI_FINGER_ATA_NODE
+extern void pri_ftm_node_exist(int exist);
+#endif
+//prize add by dengbinggui for ata node 20240927 end
+
 static int ff_spi_probe(struct spi_device *spi)
 {
     int ret = 0;
@@ -486,6 +492,14 @@ static int ff_spi_probe(struct spi_device *spi)
             spi_set_drvdata(spi, NULL);
             return ret;
         }
+		// prize add by dengbinggui for ata node 20240927 start
+		#ifdef CONFIG_PRI_FINGER_ATA_NODE
+		else{
+			FF_LOGE("get chip id success, ret=%d", ret);
+			pri_ftm_node_exist(1);
+		}
+		#endif
+		// prize add by dengbinggui for ata node 20240927 end
     }
 
     if (ff_ctx->b_ree) {

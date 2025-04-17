@@ -1,13 +1,12 @@
-/* SPDX-License-Identifier: GPL-2.0 */
 #ifndef CTS_PLATFORM_H
 #define CTS_PLATFORM_H
 
 #include <linux/types.h>
 #include <asm/byteorder.h>
+#include <asm/unaligned.h>
 #include <linux/bitops.h>
 #include <linux/ctype.h>
-//#include <linux/unaligned/access_ok.h>
-#include <asm-generic/unaligned.h>
+// #include <linux/unaligned/access_ok.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/module.h>
@@ -48,17 +47,6 @@
 #include "cts_config.h"
 #include "cts_core.h"
 
-#ifdef TPD_SUPPORT_I2C_DMA
-#include <linux/dma-mapping.h>
-#endif /* TPD_SUPPORT_I2C_DMA */
-
-#ifdef CONFIG_MTK_BOOT
-#include "mtk_boot_common.h"
-#endif /* CONFIG_MTK_BOOT */
-
-#include "tpd.h"
-#include "tpd_debug.h"
-
 extern bool cts_show_debug_log;
 
 #ifndef LOG_TAG
@@ -94,6 +82,14 @@ struct cts_device_gesture_info;
 
 struct cts_platform_data {
     int irq;
+    int int_gpio;
+#ifdef CFG_CTS_HAS_RESET_PIN
+    int rst_gpio;
+#endif
+
+#ifdef CFG_CTS_MANUAL_CS
+    int cs_gpio;
+#endif
 
     u32 res_x;
     u32 res_y;
@@ -128,10 +124,9 @@ struct cts_platform_data {
     bool irq_wake_enabled;
 #endif
 
-#ifdef TPD_SUPPORT_I2C_DMA
-        u8 *i2c_dma_buff_va;
-        dma_addr_t i2c_dma_buff_pa;
-#endif /* TPD_SUPPORT_I2C_DMA */
+#ifdef CONFIG_CTS_PM_FB_NOTIFIER
+    struct notifier_block fb_notifier;
+#endif
 
 #ifdef CFG_CTS_FORCE_UP
     struct delayed_work touch_event_timeout_work;
@@ -151,15 +146,7 @@ struct cts_platform_data {
     u8 spi_rx_buf[ALIGN(CFG_CTS_MAX_SPI_XFER_SIZE + 10, 4)];
     u8 spi_tx_buf[ALIGN(CFG_CTS_MAX_SPI_XFER_SIZE + 10, 4)];
     u32 spi_speed;
-#ifdef CFG_CTS_MANUAL_CS
-    struct pinctrl *pinctrl1;
-    struct pinctrl_state *spi_cs_low, *spi_cs_high;
 #endif
-#endif/* CONFIG_CTS_I2C_HOST */
-
-#ifdef TPD_SUPPORT_I2C_DMA
-        bool i2c_dma_available;
-#endif /* TPD_SUPPORT_I2C_DMA */
 };
 
 #ifdef CONFIG_CTS_I2C_HOST
@@ -194,10 +181,9 @@ extern int cts_init_platform_data(struct cts_platform_data *pdata,
 extern int cts_init_platform_data(struct cts_platform_data *pdata,
         struct spi_device *spi);
 #endif
-
 extern int cts_plat_is_normal_mode(struct cts_platform_data *pdata);
-extern int cts_plat_spi_set_mode(struct cts_platform_data *pdata);
 
+extern int cts_deinit_platform_data(struct cts_platform_data *pdata);
 extern int cts_plat_request_resource(struct cts_platform_data *pdata);
 extern void cts_plat_free_resource(struct cts_platform_data *pdata);
 

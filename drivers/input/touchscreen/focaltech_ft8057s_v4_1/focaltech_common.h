@@ -145,7 +145,11 @@ struct ts_ic_info {
     struct ft_chip_t ids;
     struct ft_chip_id_t cid;
 };
-
+//drv Added the double-click wake up function-pzp-20240817-start
+#if IS_ENABLED(CONFIG_PRIZE_COMMON_NODE)
+extern bool fts_gesture_status(void);
+#endif
+//drv Added the double-click wake up function-pzp-20240817-end
 /*****************************************************************************
 * DEBUG function define here
 *****************************************************************************/

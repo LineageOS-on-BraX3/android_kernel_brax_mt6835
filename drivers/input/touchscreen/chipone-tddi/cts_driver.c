@@ -10,12 +10,19 @@
 #include "cts_sysfs.h"
 #include "cts_charger_detect.h"
 #include "cts_earjack_detect.h"
-#include "cts_strerror.h"
 #include "cts_oem.h"
 
-extern struct chipone_ts_data *chipone_ts_data;
-
 static void cts_resume_work_func(struct work_struct *work);
+#ifdef CFG_CTS_DRM_NOTIFIER
+#include <drm/drm_panel.h>
+static struct drm_panel *active_panel;
+static int check_dt(struct device_node *np);
+//drv add by chenjiaxi, support mtk drm mediatek v2 notifier, begin
+#elif defined(CFG_CTS_DRM_MEDIATEK_V2_NOTIFIER)
+#include "mtk_disp_notify.h"
+#include "mtk_panel_ext.h"
+//drv add by chenjiaxi, support mtk drm mediatek v2 notifier, end
+#endif
 bool cts_show_debug_log;
 #ifdef CTS_MTK_GET_PANEL
 static char *active_panel_name;
@@ -23,6 +30,8 @@ static char *active_panel_name;
 
 module_param_named(debug_log, cts_show_debug_log, bool, 0660);
 MODULE_PARM_DESC(debug_log, "Show debug log control");
+
+struct chipone_ts_data *g_cts_data;
 
 int cts_suspend(struct chipone_ts_data *cts_data)
 {
@@ -103,40 +112,217 @@ int cts_resume(struct chipone_ts_data *cts_data)
 static void cts_resume_work_func(struct work_struct *work)
 {
     struct chipone_ts_data *cts_data =
-        container_of(work, struct chipone_ts_data, ts_resume_work);
+    container_of(work, struct chipone_ts_data, ts_resume_work);
     cts_info("%s", __func__);
     cts_resume(cts_data);
 }
-/* prize added by KLJ, prize disp notifier function, 20240423-start */
-#if IS_ENABLED(CONFIG_DRM_MEDIATEK)
 
-static int nvt_disp_notifier_callback(struct notifier_block *nb,
-	unsigned long value, void *v)
+#ifdef CONFIG_CTS_PM_FB_NOTIFIER
+#ifdef CFG_CTS_DRM_NOTIFIER
+static int fb_notifier_callback(struct notifier_block *nb,
+        unsigned long action, void *data)
 {
-	struct chipone_ts_data *cts_data = container_of(nb, struct chipone_ts_data, disp_notifier);
-	int *data = (int *)v;
+    volatile int blank;
+    const struct cts_platform_data *pdata =
+    container_of(nb, struct cts_platform_data, fb_notifier);
+    struct chipone_ts_data *cts_data =
+    container_of(pdata->cts_dev, struct chipone_ts_data, cts_dev);
+    struct drm_panel_notifier *evdata = data;
 
-	if (cts_data && v) {
-		cts_err("%s IN", __func__);
-		if (value == MTK_DISP_EARLY_EVENT_BLANK) {
-			if (*data == MTK_DISP_BLANK_POWERDOWN) {
-				cts_suspend(cts_data);
-			}
-		} else if (value == MTK_DISP_EVENT_BLANK) {
-			if (*data == MTK_DISP_BLANK_UNBLANK) {
-				cts_resume(cts_data);
-			}
-		}
-		cts_err("%s OUT", __func__);
-	} else {
-		cts_err("chipone IC can not suspend or resume");
-		return -1;
-	}
+    cts_info("FB notifier callback");
+    if (!evdata || !cts_data)
+        return 0;
 
-	return 0;
+    blank = *(int *)evdata->data;
+    cts_info("action=%lu, blank=%d\n", action, blank);
+
+    if (action == DRM_PANEL_EARLY_EVENT_BLANK) {
+        if (blank == DRM_PANEL_BLANK_POWERDOWN)
+            cts_suspend(cts_data);
+    } else if (evdata->data) {
+        blank = *(int *)evdata->data;
+        if (action == DRM_PANEL_EVENT_BLANK) {
+            if (blank == DRM_PANEL_BLANK_UNBLANK)
+                /* cts_resume(cts_data); */
+                queue_work(cts_data->workqueue,
+                    &cts_data->ts_resume_work);
+        }
+    }
+
+    return 0;
+}
+//drv add by chenjiaxi, support mtk drm mediatek v2 notifier, begin
+#elif defined(CFG_CTS_DRM_MEDIATEK_V2_NOTIFIER)
+static int fb_notifier_callback(struct notifier_block *nb,
+        unsigned long value, void *v)
+{
+    const struct cts_platform_data *pdata = container_of(nb, struct cts_platform_data, fb_notifier);
+    struct chipone_ts_data *cts_data = container_of(pdata->cts_dev, struct chipone_ts_data, cts_dev);
+    int *data = (int *)v;
+
+    cts_info("FB notifier callback");
+
+    if (cts_data && v) {
+        if (value == MTK_DISP_EVENT_BLANK) {
+            if (*data == MTK_DISP_BLANK_UNBLANK) {
+                /* cts_resume(cts_data); */
+                queue_work(cts_data->workqueue,
+                    &cts_data->ts_resume_work);
+                return NOTIFY_OK;
+            }
+        } else if (value == MTK_DISP_EARLY_EVENT_BLANK) {
+            if (*data == MTK_DISP_BLANK_POWERDOWN) {
+                cts_suspend(cts_data);
+                return NOTIFY_OK;
+            }
+        }
+    }
+
+    return NOTIFY_DONE;
+}
+//drv add by chenjiaxi, support mtk drm mediatek v2 notifier, end
+#else
+static int fb_notifier_callback(struct notifier_block *nb,
+        unsigned long action, void *data)
+{
+    volatile int blank;
+    const struct cts_platform_data *pdata =
+    container_of(nb, struct cts_platform_data, fb_notifier);
+    struct chipone_ts_data *cts_data =
+    container_of(pdata->cts_dev, struct chipone_ts_data, cts_dev);
+    struct fb_event *evdata = data;
+
+    cts_info("FB notifier callback");
+
+    if (evdata && evdata->data) {
+        if (action == FB_EVENT_BLANK) {
+            blank = *(int *)evdata->data;
+            if (blank == FB_BLANK_UNBLANK) {
+                /* cts_resume(cts_data); */
+                queue_work(cts_data->workqueue,
+                    &cts_data->ts_resume_work);
+                return NOTIFY_OK;
+            }
+        } else if (action == FB_EARLY_EVENT_BLANK) {
+            blank = *(int *)evdata->data;
+            if (blank == FB_BLANK_POWERDOWN) {
+                cts_suspend(cts_data);
+                return NOTIFY_OK;
+            }
+        }
+    }
+
+    return NOTIFY_DONE;
 }
 #endif
-/* prize added by KLJ, prize disp notifier function, 20240423-end */
+
+static int cts_init_pm_fb_notifier(struct chipone_ts_data *cts_data)
+{
+    cts_info("Init FB notifier");
+
+    cts_data->pdata->fb_notifier.notifier_call = fb_notifier_callback;
+
+#ifdef CFG_CTS_DRM_NOTIFIER
+    {
+        int ret = -ENODEV;
+
+        if (active_panel) {
+            ret =drm_panel_notifier_register(active_panel,
+                    &cts_data->pdata->fb_notifier);
+            if (ret)
+                cts_err("register drm_notifier failed. ret=%d\n", ret);
+        }
+        return ret;
+    }
+//drv add by chenjiaxi, support mtk drm mediatek v2 notifier, begin
+#elif defined(CFG_CTS_DRM_MEDIATEK_V2_NOTIFIER)
+	return mtk_disp_notifier_register("Chipone Touch", &cts_data->pdata->fb_notifier);
+//drv add by chenjiaxi, support mtk drm mediatek v2 notifier, end
+#else
+    return fb_register_client(&cts_data->pdata->fb_notifier);
+#endif
+}
+
+static int cts_deinit_pm_fb_notifier(struct chipone_ts_data *cts_data)
+{
+    cts_info("Deinit FB notifier");
+#ifdef CFG_CTS_DRM_NOTIFIER
+    {
+        int ret = 0;
+
+        if (active_panel) {
+            ret = drm_panel_notifier_unregister(active_panel,
+                    &cts_data->pdata->fb_notifier);
+            if (ret)
+                cts_err("Error occurred while unregistering drm_notifier.\n");
+        }
+        return ret;
+    }
+//drv add by chenjiaxi, support mtk drm mediatek v2 notifier, begin
+#elif defined(CFG_CTS_DRM_MEDIATEK_V2_NOTIFIER)
+	return mtk_disp_notifier_unregister(&cts_data->pdata->fb_notifier);
+//drv add by chenjiaxi, support mtk drm mediatek v2 notifier, end
+#else
+    return fb_unregister_client(&cts_data->pdata->fb_notifier);
+#endif
+}
+#endif /* CONFIG_CTS_PM_FB_NOTIFIER */
+
+#ifdef CFG_CTS_DRM_NOTIFIER
+static int check_dt(struct device_node *np)
+{
+    int i;
+    int count;
+    struct device_node *node;
+    struct drm_panel *panel;
+
+    count = of_count_phandle_with_args(np, "panel", NULL);
+    if (count <= 0)
+        return 0;
+
+    for (i = 0; i < count; i++) {
+        node = of_parse_phandle(np, "panel", i);
+        panel = of_drm_find_panel(node);
+        of_node_put(node);
+        if (!IS_ERR(panel)) {
+            cts_info("check active_panel");
+            active_panel = panel;
+            return 0;
+        }
+    }
+    if (node)
+        cts_err("%s: %s not actived", __func__, node->name);
+    return -ENODEV;
+}
+
+static int check_default_tp(struct device_node *dt, const char *prop)
+{
+    const char *active_tp;
+    const char *compatible;
+    char *start;
+    int ret;
+
+    ret = of_property_read_string(dt->parent, prop, &active_tp);
+    if (ret) {
+        cts_err("%s:fail to read %s %d", __func__, prop, ret);
+        return -ENODEV;
+    }
+
+    ret = of_property_read_string(dt, "compatible", &compatible);
+    if (ret < 0) {
+        cts_err("%s:fail to read %s %d", __func__, "compatible", ret);
+        return -ENODEV;
+    }
+
+    start = strnstr(active_tp, compatible, strlen(active_tp));
+    if (start == NULL) {
+        cts_err("no match compatible, %s, %s", compatible, active_tp);
+        ret = -ENODEV;
+    }
+
+    return ret;
+}
+#endif
 
 #ifdef CTS_MTK_GET_PANEL
 char panel_name[50] = { 0 };
@@ -190,6 +376,7 @@ static int cts_get_panel(void)
 }
 #endif
 
+
 #ifdef CONFIG_CTS_I2C_HOST
 static int cts_driver_probe(struct i2c_client *client,
         const struct i2c_device_id *id)
@@ -208,18 +395,30 @@ static int cts_driver_probe(struct spi_device *client)
     }
 #endif
 
-#ifdef CONFIG_CTS_I2C_HOST
-    if (client == NULL) {
-        cts_err("Probe i2c client = NULL");
-        return -EINVAL;
+#ifdef CFG_CTS_DRM_NOTIFIER
+    {
+        struct device_node *dp = client->dev.of_node;
+
+        if (check_dt(dp)) {
+            if (!check_default_tp(dp, "qcom,i2c-touch-active"))
+                ret = -EPROBE_DEFER;
+            else
+                ret = -ENODEV;
+
+            cts_err("%s: %s not actived\n", __func__, dp->name);
+            return ret;
+        }
     }
+#endif
+
+#ifdef CONFIG_CTS_I2C_HOST
     cts_info("Probe i2c client: name='%s' addr=0x%02x flags=0x%02x irq=%d",
-            client->name, client->addr, client->flags, client->irq);
+        client->name, client->addr, client->flags, client->irq);
 
 #if !defined(CONFIG_MTK_PLATFORM)
     if (client->addr != CTS_DEV_NORMAL_MODE_I2CADDR) {
         cts_err("Probe i2c addr 0x%02x != driver config addr 0x%02x",
-                client->addr, CTS_DEV_NORMAL_MODE_I2CADDR);
+            client->addr, CTS_DEV_NORMAL_MODE_I2CADDR);
         return -ENODEV;
     };
 #endif
@@ -228,26 +427,14 @@ static int cts_driver_probe(struct spi_device *client)
         cts_err("Check functionality failed");
         return -ENODEV;
     }
-#else
-    if (client == NULL) {
-        cts_info("Probe spi client = NULL");
-        return -EINVAL;
-    }
-    cts_info("Probe spi device '%s': "
-             "mode='%u' speed=%u bits_per_word=%u "
-             "chip_select=%u, cs_gpio=%d irq=%d",
-        client->modalias, client->mode, client->max_speed_hz, client->bits_per_word,
-        client->chip_select, client->cs_gpio, client->irq);
 #endif
 
-    cts_data =
-        (struct chipone_ts_data *)kzalloc(sizeof(*cts_data), GFP_KERNEL);
+    cts_data = kzalloc(sizeof(struct chipone_ts_data), GFP_KERNEL);
     if (cts_data == NULL) {
         cts_err("Allocate chipone_ts_data failed");
         return -ENOMEM;
     }
-    cts_data->pdata = (struct cts_platform_data *)
-        kzalloc(sizeof(struct cts_platform_data), GFP_KERNEL);
+    cts_data->pdata = kzalloc(sizeof(struct cts_platform_data), GFP_KERNEL);
     if (cts_data->pdata == NULL) {
         cts_err("Allocate cts_platform_data failed");
         ret = -ENOMEM;
@@ -263,35 +450,23 @@ static int cts_driver_probe(struct spi_device *client)
     cts_data->device = &client->dev;
 #endif
 
-/* prize added by KLJ, prize tp gesture function, 20240418-start */
-#ifdef CFG_CTS_GESTURE	
-	g_cts_data = cts_data;
-    gesture_init();
-#endif
-/* prize added by KLJ, prize tp gesture function, 20240418-end */
-
-    ret = cts_init_platform_data(cts_data->pdata, client);
-    if (ret) {
-        cts_err("Init platform data failed %d(%s)", ret, cts_strerror(ret));
-        goto err_free_pdata;
-    }
+    cts_init_platform_data(cts_data->pdata, client);
 
     cts_data->cts_dev.pdata = cts_data->pdata;
     cts_data->pdata->cts_dev = &cts_data->cts_dev;
 
-    chipone_ts_data = cts_data;
+    g_cts_data = cts_data;
 
     cts_data->workqueue =
-        create_singlethread_workqueue(CFG_CTS_DEVICE_NAME "-workqueue");
+    create_singlethread_workqueue(CFG_CTS_DEVICE_NAME "-workqueue");
     if (cts_data->workqueue == NULL) {
         cts_err("Create workqueue failed");
         ret = -ENOMEM;
-        goto err_free_pdata;
+        goto err_deinit_platform_data;
     }
-
 #ifdef CONFIG_CTS_ESD_PROTECTION
     cts_data->esd_workqueue =
-        create_singlethread_workqueue(CFG_CTS_DEVICE_NAME "-esd_workqueue");
+    create_singlethread_workqueue(CFG_CTS_DEVICE_NAME "-esd_workqueue");
     if (cts_data->esd_workqueue == NULL) {
         cts_err("Create esd workqueue failed");
         ret = -ENOMEM;
@@ -355,10 +530,18 @@ static int cts_driver_probe(struct spi_device *client)
     if (ret < 0)
         cts_warn("Add sysfs entry for device failed %d", ret);
 
+#ifdef CONFIG_CTS_PM_FB_NOTIFIER
+    ret = cts_init_pm_fb_notifier(cts_data);
+    if (ret) {
+        cts_err("Init FB notifier failed %d", ret);
+        goto err_deinit_sysfs;
+    }
+#endif
+
     ret = cts_plat_request_irq(cts_data->pdata);
     if (ret < 0) {
         cts_err("Request IRQ failed %d", ret);
-        goto err_deinit_sysfs;
+        goto err_register_fb;
     }
 
 #ifdef CONFIG_CTS_CHARGER_DETECT
@@ -389,58 +572,45 @@ static int cts_driver_probe(struct spi_device *client)
     /* Init firmware upgrade work and schedule */
     INIT_DELAYED_WORK(&cts_data->fw_upgrade_work, cts_firmware_upgrade_work);
     queue_delayed_work(cts_data->workqueue, &cts_data->fw_upgrade_work,
-            msecs_to_jiffies(15 * 1000));
+        msecs_to_jiffies(10 * 1000));
 
     INIT_WORK(&cts_data->ts_resume_work, cts_resume_work_func);
-/* prize added by KLJ, prize disp notifier function, 20240423-start */
-#if IS_ENABLED(CONFIG_DRM_MEDIATEK)
-	cts_data->disp_notifier.notifier_call = nvt_disp_notifier_callback;
-	ret = mtk_disp_notifier_register("Chipone Touch", &cts_data->disp_notifier);
-	if (ret) {
-		cts_err("Failed to register disp notifier client:%d", ret);
-		//goto err_register_disp_notif_failed;
-	}
-	else{
-		pr_err("gezi disp_notifier register success.\n");
-	}
-#endif
-/* prize added by KLJ, prize disp notifier function, 20240423-end */	
-#ifdef CONFIG_MTK_PLATFORM
-    tpd_load_status = 1;
-#endif /* CONFIG_MTK_PLATFORM */
 
     return 0;
 
 err_deinit_oem:
     cts_oem_deinit(cts_data);
 
-#ifdef CONFIG_CTS_CHARGER_DETECT
-    cts_charger_detect_deinit(cts_data);
-#endif
 #ifdef CONFIG_CTS_EARJACK_DETECT
     cts_earjack_detect_deinit(cts_data);
 #endif
-
+#ifdef CONFIG_CTS_CHARGER_DETECT
+    cts_charger_detect_deinit(cts_data);
+#endif
     cts_plat_free_irq(cts_data->pdata);
 
+err_register_fb:
+#ifdef CONFIG_CTS_PM_FB_NOTIFIER
+    cts_deinit_pm_fb_notifier(cts_data);
 err_deinit_sysfs:
+#endif
     cts_sysfs_remove_device(&client->dev);
 #ifdef CONFIG_CTS_LEGACY_TOOL
     cts_tool_deinit(cts_data);
-#endif /* CONFIG_CTS_LEGACY_TOOL */
+#endif
 
 #ifdef CONFIG_CTS_ESD_PROTECTION
     cts_deinit_esd_protection(cts_data);
-#endif /* CONFIG_CTS_ESD_PROTECTION */
+#endif
 
 #ifdef CFG_CTS_GESTURE
     cts_plat_deinit_gesture(cts_data->pdata);
-#endif /* CFG_CTS_GESTURE */
+#endif
 
 err_deinit_vkey_device:
 #ifdef CONFIG_CTS_VIRTUALKEY
     cts_plat_deinit_vkey_device(cts_data->pdata);
-#endif /* CONFIG_CTS_VIRTUALKEY */
+#endif
 
 err_deinit_touch_device:
     cts_plat_deinit_touch_device(cts_data->pdata);
@@ -459,7 +629,8 @@ err_destroy_esd_workqueue:
 err_destroy_workqueue:
 #endif
     destroy_workqueue(cts_data->workqueue);
-err_free_pdata:
+err_deinit_platform_data:
+    cts_deinit_platform_data(cts_data->pdata);
     kfree(cts_data->pdata);
 err_free_cts_data:
     kfree(cts_data);
@@ -472,7 +643,7 @@ err_free_cts_data:
 #ifdef CONFIG_CTS_I2C_HOST
 static int cts_driver_remove(struct i2c_client *client)
 #else
-static int cts_driver_remove(struct spi_device *client)
+static int cts_driver_remove(struct spi_device *spi)
 #endif
 {
     struct chipone_ts_data *cts_data;
@@ -483,7 +654,7 @@ static int cts_driver_remove(struct spi_device *client)
 #ifdef CONFIG_CTS_I2C_HOST
     cts_data = (struct chipone_ts_data *)i2c_get_clientdata(client);
 #else
-    cts_data = (struct chipone_ts_data *)spi_get_drvdata(client);
+    cts_data = (struct chipone_ts_data *)spi_get_drvdata(spi);
 #endif
     if (cts_data) {
         ret = cts_stop_device(&cts_data->cts_dev);
@@ -500,9 +671,17 @@ static int cts_driver_remove(struct spi_device *client)
 
         cts_plat_free_irq(cts_data->pdata);
 
+#ifdef CONFIG_CTS_PM_FB_NOTIFIER
+        cts_deinit_pm_fb_notifier(cts_data);
+#endif
+
         cts_tool_deinit(cts_data);
 
+#ifdef CONFIG_CTS_I2C_HOST
         cts_sysfs_remove_device(&client->dev);
+#else
+        cts_sysfs_remove_device(&spi->dev);
+#endif
 
         cts_deinit_esd_protection(cts_data);
 
@@ -529,16 +708,53 @@ static int cts_driver_remove(struct spi_device *client)
         if (cts_data->workqueue)
             destroy_workqueue(cts_data->workqueue);
 
+        cts_deinit_platform_data(cts_data->pdata);
+
         if (cts_data->pdata)
             kfree(cts_data->pdata);
         kfree(cts_data);
     } else {
         cts_warn("Chipone i2c driver remove while NULL chipone_ts_data");
+
         return -EINVAL;
     }
 
     return ret;
 }
+
+#ifdef CONFIG_CTS_PM_LEGACY
+static int cts_i2c_driver_suspend(struct device *dev, pm_message_t state)
+{
+    cts_info("Suspend by legacy power management");
+    return cts_suspend(dev_get_drvdata(dev));
+}
+
+static int cts_i2c_driver_resume(struct device *dev)
+{
+    cts_info("Resume by legacy power management");
+    return cts_resume(dev_get_drvdata(dev));
+}
+#endif /* CONFIG_CTS_PM_LEGACY */
+
+#ifdef CONFIG_CTS_PM_GENERIC
+static int cts_i2c_driver_pm_suspend(struct device *dev)
+{
+    cts_info("Suspend by bus power management");
+    return cts_suspend(dev_get_drvdata(dev));
+}
+
+static int cts_i2c_driver_pm_resume(struct device *dev)
+{
+    cts_info("Resume by bus power management");
+    return cts_resume(dev_get_drvdata(dev));
+}
+
+/* bus control the suspend/resume procedure */
+static const struct dev_pm_ops cts_i2c_driver_pm_ops = {
+    .suspend = cts_i2c_driver_pm_suspend,
+    .resume = cts_i2c_driver_pm_resume,
+};
+#endif /* CONFIG_CTS_PM_GENERIC */
 
 #ifdef CONFIG_CTS_SYSFS
 static ssize_t reset_pin_show(struct device_driver *driver, char *buf)
@@ -549,7 +765,7 @@ static ssize_t reset_pin_show(struct device_driver *driver, char *buf)
 #else
             'N'
 #endif
-        );
+    );
 }
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
@@ -566,7 +782,7 @@ static ssize_t swap_xy_show(struct device_driver *dev, char *buf)
 #else
             'N'
 #endif
-        );
+    );
 }
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
@@ -583,7 +799,7 @@ static ssize_t wrap_x_show(struct device_driver *dev, char *buf)
 #else
             'N'
 #endif
-        );
+    );
 }
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
@@ -600,7 +816,7 @@ static ssize_t wrap_y_show(struct device_driver *dev, char *buf)
 #else
             'N'
 #endif
-        );
+    );
 }
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
@@ -617,7 +833,7 @@ static ssize_t force_update_show(struct device_driver *dev, char *buf)
 #else
             'N'
 #endif
-        );
+    );
 }
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
@@ -646,7 +862,7 @@ static ssize_t vkey_show(struct device_driver *dev, char *buf)
 #else
             'N'
 #endif
-        );
+    );
 }
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
@@ -663,7 +879,7 @@ static ssize_t gesture_show(struct device_driver *dev, char *buf)
 #else
             'N'
 #endif
-        );
+    );
 }
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
@@ -680,7 +896,7 @@ static ssize_t esd_protection_show(struct device_driver *dev, char *buf)
 #else
             'N'
 #endif
-        );
+    );
 }
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
@@ -697,7 +913,7 @@ static ssize_t slot_protocol_show(struct device_driver *dev, char *buf)
 #else
             'N'
 #endif
-        );
+    );
 }
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
@@ -735,7 +951,7 @@ static DRIVER_ATTR(driver_info, S_IRUGO, driver_info_show, NULL);
 static DRIVER_ATTR_RO(driver_info);
 #endif
 
-static struct attribute *cts_driver_config_attrs[] = {
+static struct attribute *cts_i2c_driver_config_attrs[] = {
     &driver_attr_reset_pin.attr,
     &driver_attr_swap_xy.attr,
     &driver_attr_wrap_x.attr,
@@ -751,24 +967,24 @@ static struct attribute *cts_driver_config_attrs[] = {
     NULL
 };
 
-static const struct attribute_group cts_driver_config_group = {
+static const struct attribute_group cts_i2c_driver_config_group = {
     .name = "config",
-    .attrs = cts_driver_config_attrs,
+    .attrs = cts_i2c_driver_config_attrs,
 };
 
-static const struct attribute_group *cts_driver_config_groups[] = {
-    &cts_driver_config_group,
+static const struct attribute_group *cts_i2c_driver_config_groups[] = {
+    &cts_i2c_driver_config_group,
     NULL,
 };
 #endif /* CONFIG_CTS_SYSFS */
 
 #ifdef CONFIG_CTS_OF
-static const struct of_device_id cts_driver_of_match_table[] = {
+static const struct of_device_id cts_i2c_of_match_table[] = {
     {.compatible = CFG_CTS_OF_DEVICE_ID_NAME, },
     { },
 };
 
-MODULE_DEVICE_TABLE(of, cts_driver_of_match_table);
+MODULE_DEVICE_TABLE(of, cts_i2c_of_match_table);
 #endif /* CONFIG_CTS_OF */
 
 #ifdef CONFIG_CTS_I2C_HOST
@@ -794,56 +1010,54 @@ static struct spi_driver cts_spi_driver = {
         .name = CFG_CTS_DRIVER_NAME,
         .owner = THIS_MODULE,
 #ifdef CONFIG_CTS_OF
-        .of_match_table = of_match_ptr(cts_driver_of_match_table),
+        .of_match_table = of_match_ptr(cts_i2c_of_match_table),
 #endif /* CONFIG_CTS_OF */
 #ifdef CONFIG_CTS_SYSFS
-        .groups = cts_driver_config_groups,
+        .groups = cts_i2c_driver_config_groups,
 #endif /* CONFIG_CTS_SYSFS */
-    },
+#ifdef CONFIG_CTS_PM_LEGACY
+        .suspend = cts_i2c_driver_suspend,
+        .resume = cts_i2c_driver_resume,
+#endif /* CONFIG_CTS_PM_LEGACY */
+#ifdef CONFIG_CTS_PM_GENERIC
+        .pm = &cts_i2c_driver_pm_ops,
+#endif /* CONFIG_CTS_PM_GENERIC */
+
+        },
     .id_table = cts_device_id_table,
 };
 
-int cts_driver_init(void)
+static int __init cts_driver_init(void)
 {
-    int ret = 0;
-
     cts_info("Chipone touch driver init, version: "CFG_CTS_DRIVER_VERSION);
 
 #ifdef CONFIG_CTS_I2C_HOST
     cts_info(" - Register i2c driver");
-    ret = i2c_add_driver(&cts_i2c_driver);
-    if (ret) {
-        cts_info("Register i2c driver failed %d(%s)", ret, cts_strerror(ret));
-        return ret;
-    }
-#endif
-
-#ifdef CONFIG_CTS_SPI_HOST
+    return i2c_add_driver(&cts_i2c_driver);
+#else
     cts_info(" - Register spi driver");
-    ret = spi_register_driver(&cts_spi_driver);
-    if (ret) {
-        cts_info("Register spi driver failed %d(%s)", ret, cts_strerror(ret));
-        return ret;
-    }
+    return spi_register_driver(&cts_spi_driver);
 #endif
-
-    cts_info(" - Register touch driver successfully");
-
-    return 0;
 }
 
-void cts_driver_exit(void)
+static void __exit cts_driver_exit(void)
 {
     cts_info("Exit");
 
 #ifdef CONFIG_CTS_I2C_HOST
-    cts_info(" - Delete i2c driver");
     i2c_del_driver(&cts_i2c_driver);
-#endif
-
-#ifdef CONFIG_CTS_SPI_HOST
-    cts_info(" - Delete spi driver");
+#else
     spi_unregister_driver(&cts_spi_driver);
 #endif
 }
 
+module_init(cts_driver_init);
+module_exit(cts_driver_exit);
+
+#if KERNEL_VERSION(5, 4, 0) <= LINUX_VERSION_CODE
+MODULE_IMPORT_NS(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver);
+#endif
+MODULE_DESCRIPTION("Chipone TDDI touchscreen Driver for QualComm platform");
+MODULE_VERSION(CFG_CTS_DRIVER_VERSION);
+MODULE_AUTHOR("Miao Defang <dfmiao@chiponeic.com>");
+MODULE_LICENSE("GPL");

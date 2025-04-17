@@ -29,7 +29,9 @@
 #include "../mediatek/mediatek_v2/mtk_drm_graphics_base.h"
 #endif
 //drv Added the double-click wake up function-pzp-20240817-start
+#if IS_ENABLED(CONFIG_PRIZE_COMMON_NODE)
 #include "../../../input/touchscreen/focaltech_ft8725_spi/focaltech_common.h"
+#endif
 //drv Added the double-click wake up function-pzp-20240817-end
 #if IS_ENABLED(CONFIG_PRIZE_HARDWARE_INFO)
 #include "../../../misc/mediatek/prize/hardware_info/hardware_info.h"
@@ -163,30 +165,27 @@ static void focaltech_panel_init(struct focaltech_lcm *ctx)
 	focaltech_dcs_write_seq_static(ctx,0xFF,0x87,0x25,0x01);
 	focaltech_dcs_write_seq_static(ctx,0x00,0x80);
 	focaltech_dcs_write_seq_static(ctx,0xFF,0x87,0x25);
-
-
 	focaltech_dcs_write_seq_static(ctx,0x00,0xA3);
 	focaltech_dcs_write_seq_static(ctx,0xB3,0x09,0x68,0x00,0x18); //1080x2408
-
 	//==============================================
 	//TCON		
 	focaltech_dcs_write_seq_static(ctx,0x00, 0x80);		
-	focaltech_dcs_write_seq_static(ctx,0xC0, 0x00 ,0x4A ,0x00 ,0x14 ,0x00 ,0x14);		
+	focaltech_dcs_write_seq_static(ctx,0xC0, 0x00 ,0x4A ,0x00 ,0x2F ,0x00 ,0x14);		
 			
 	focaltech_dcs_write_seq_static(ctx,0x00, 0x90);		
-	focaltech_dcs_write_seq_static(ctx,0xC0, 0x00 ,0x4A ,0x00 ,0x14 ,0x00 ,0x14);		
+	focaltech_dcs_write_seq_static(ctx,0xC0, 0x00 ,0x4A ,0x00 ,0x2F ,0x00 ,0x14);		
 			
 	focaltech_dcs_write_seq_static(ctx,0x00, 0xA0);		
-	focaltech_dcs_write_seq_static(ctx,0xC0, 0x00 ,0x97 ,0x00 ,0x14 ,0x00 ,0x14);		
+	focaltech_dcs_write_seq_static(ctx,0xC0, 0x00 ,0x97 ,0x00 ,0x2F ,0x00 ,0x14);		
 			
 	focaltech_dcs_write_seq_static(ctx,0x00, 0xB0);		
-	focaltech_dcs_write_seq_static(ctx,0xC0, 0x00 ,0xCF ,0x00 ,0x14 ,0x14);		
+	focaltech_dcs_write_seq_static(ctx,0xC0, 0x00 ,0xCD ,0x00 ,0x2F ,0x14);		
 			
 	focaltech_dcs_write_seq_static(ctx,0x00, 0xC1);		
 	focaltech_dcs_write_seq_static(ctx,0xC0, 0x00 ,0x94 ,0x00 ,0x81 ,0x00 ,0x63 ,0x00 ,0xC1);		
 			
 	focaltech_dcs_write_seq_static(ctx,0x00, 0x70);		
-	focaltech_dcs_write_seq_static(ctx,0xC0, 0x00 ,0xB3 ,0x00 ,0x14 ,0x00 ,0x14);		
+	focaltech_dcs_write_seq_static(ctx,0xC0, 0x00 ,0xB1 ,0x00 ,0x2F ,0x00 ,0x14);		
 			
 	focaltech_dcs_write_seq_static(ctx,0x00, 0xA3);		
 	focaltech_dcs_write_seq_static(ctx,0xC1, 0x00, 0x67, 0x00 ,0x2F ,0x00 ,0x02);		
@@ -198,13 +197,13 @@ static void focaltech_panel_init(struct focaltech_lcm *ctx)
 	focaltech_dcs_write_seq_static(ctx,0xCE, 0xFF ,0xFF);		
 			
 	focaltech_dcs_write_seq_static(ctx,0x00, 0x80);		
-	focaltech_dcs_write_seq_static(ctx,0xCE, 0x01, 0x81 ,0xFF ,0xFF ,0x00 ,0xC0 ,0x00 ,0xC8 ,0x00 ,0xC0 ,0x00 ,0xC8 ,0x00 ,0xD0 ,0x00,0xD0);		
+	focaltech_dcs_write_seq_static(ctx,0xCE, 0x01, 0x81 ,0xFF ,0xFF ,0x00 ,0xC0 ,0x00 ,0xC8 ,0x00 ,0xBC ,0x00 ,0xC8 ,0x00 ,0xD0 ,0x00,0xD0);		
 			
 	focaltech_dcs_write_seq_static(ctx,0x00, 0x90);		
-	focaltech_dcs_write_seq_static(ctx,0xCE, 0x00 ,0xB7 ,0x0F ,0x7D ,0x00 ,0xB7 ,0x80 ,0xFF ,0xFF ,0x00 ,0x0B ,0xB8 ,0x0F ,0x0F ,0x10);		
+	focaltech_dcs_write_seq_static(ctx,0xCE, 0x00 ,0xB7 ,0x0F ,0x7D ,0x00 ,0xB7 ,0x80 ,0xFF ,0xFF ,0x00 ,0x0B ,0xB8 ,0x0F ,0x0F ,0x11);		
 			
 	focaltech_dcs_write_seq_static(ctx,0x00, 0xA0);		
-	focaltech_dcs_write_seq_static(ctx,0xCE, 0x00 ,0x00 ,0x1B);		
+	focaltech_dcs_write_seq_static(ctx,0xCE, 0x00 ,0x00 ,0x00);		
 			
 	focaltech_dcs_write_seq_static(ctx,0x00, 0xB0);		
 	focaltech_dcs_write_seq_static(ctx,0xCE, 0x22 ,0x00 ,0x00);		
@@ -213,10 +212,10 @@ static void focaltech_panel_init(struct focaltech_lcm *ctx)
 	focaltech_dcs_write_seq_static(ctx,0xCE, 0x00 ,0x00 ,0x01 ,0x00 ,0x00 ,0x00 ,0x00);		
 			
 	focaltech_dcs_write_seq_static(ctx,0x00, 0xE1);		
-	focaltech_dcs_write_seq_static(ctx,0xCE, 0x05 ,0x01 ,0xCA ,0x02 ,0xFB ,0x02 ,0xFB ,0x00 ,0x00 ,0x00 ,0x00);		
+	focaltech_dcs_write_seq_static(ctx,0xCE, 0x05 ,0x03 ,0xEF ,0x02 ,0xFB ,0x02 ,0xFB ,0x00 ,0x00 ,0x00 ,0x00);		
 			
 	focaltech_dcs_write_seq_static(ctx,0x00, 0xF1);		
-	focaltech_dcs_write_seq_static(ctx,0xCE, 0x24 ,0x13 ,0x12 ,0x00 ,0xE3 ,0x00 ,0xEC ,0x00 ,0xE3);		
+	focaltech_dcs_write_seq_static(ctx,0xCE, 0x24 ,0x13 ,0x12 ,0x01 ,0x0C ,0x00 ,0xEC ,0x01 ,0x0C);		
 			
 	focaltech_dcs_write_seq_static(ctx,0x00, 0xB0);		
 	focaltech_dcs_write_seq_static(ctx,0xCF, 0x00 ,0x00 ,0xB6 ,0xBA);		
@@ -234,7 +233,7 @@ static void focaltech_panel_init(struct focaltech_lcm *ctx)
 	focaltech_dcs_write_seq_static(ctx,0xCF, 0x00 ,0x00 ,0xCB ,0xCF ,0x05 ,0x05 ,0x43 ,0x47);		
 			
 	focaltech_dcs_write_seq_static(ctx,0x00, 0x70);		
-	focaltech_dcs_write_seq_static(ctx,0xCF, 0x00 ,0x00 ,0xBB ,0xBF ,0x05 ,0x05 ,0x6B ,0x6F);		
+	focaltech_dcs_write_seq_static(ctx,0xCF, 0x00 ,0x00 ,0xB7 ,0xBB ,0x05 ,0x05 ,0x67 ,0x6B);		
 			
 	//Qsync Detect		
 	focaltech_dcs_write_seq_static(ctx,0x00, 0xD1);		
@@ -244,7 +243,7 @@ static void focaltech_panel_init(struct focaltech_lcm *ctx)
 	focaltech_dcs_write_seq_static(ctx,0xC1, 0x0F ,0xDC);		
 			
 	focaltech_dcs_write_seq_static(ctx,0x00, 0xE4);		
-	focaltech_dcs_write_seq_static(ctx,0xCF, 0x09 ,0xE0 ,0x09 ,0xDF ,0x09 ,0xDF ,0x09 ,0xDF ,0x09 ,0xDF ,0x09 ,0xDF);		
+	focaltech_dcs_write_seq_static(ctx,0xCF, 0x09 ,0xFB ,0x09 ,0xFA ,0x09 ,0xFA ,0x09 ,0xFA ,0x09 ,0xFA ,0x09 ,0xFA);		
 			
 	//OSC		
 	focaltech_dcs_write_seq_static(ctx,0x00, 0x80);		
@@ -316,49 +315,66 @@ static void focaltech_panel_init(struct focaltech_lcm *ctx)
 	//GOFF setting
 	focaltech_dcs_write_seq_static(ctx,0x00,0xD0);
 	focaltech_dcs_write_seq_static(ctx,0xC3,0x35,0x0A,0x00,0x00,0x35,0x0A,0x00,0x00,0x35,0x0A,0x00,0x00,0x35,0x0A,0x00,0x00);
+
+
 	focaltech_dcs_write_seq_static(ctx,0x00,0xE0);
 	focaltech_dcs_write_seq_static(ctx,0xC3,0x35,0x0A,0x00,0x00,0x35,0x0A,0x00,0x00,0x35,0x0A,0x00,0x00,0x35,0x0A,0x00,0x00);
+
 	//power off enmode setting
 	focaltech_dcs_write_seq_static(ctx,0x00,0x80);
 	focaltech_dcs_write_seq_static(ctx,0xCB,0xCD,0xCD,0xCC,0x00,0xCD,0xCC,0x00,0xCD,0xCE,0xFE,0xCD,0x00,0xCC,0xCC,0x00,0x00);
+
 	//power on enmode setting
 	focaltech_dcs_write_seq_static(ctx,0x00,0x90);
 	focaltech_dcs_write_seq_static(ctx,0xCB,0x0C,0x00,0x00,0x00,0x0C,0x0C,0x00,0x00,0x0C,0x00,0x00,0x00,0x00,0x00,0x00,0x00);
+
 	//skip & powr on1 enmode setting
 	focaltech_dcs_write_seq_static(ctx,0x00,0xA0);
 	focaltech_dcs_write_seq_static(ctx,0xCB,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00);
+
 	//power off blank enmode setting
 	focaltech_dcs_write_seq_static(ctx,0x00,0xB0);
 	focaltech_dcs_write_seq_static(ctx,0xCB,0x50,0x41,0xA4,0x00);
+
 	//power on blank enmode setting
 	focaltech_dcs_write_seq_static(ctx,0x00,0xC0);
 	focaltech_dcs_write_seq_static(ctx,0xCB,0x50,0x41,0xA4,0x00);
+
 	//power on blank enmode setting
 	focaltech_dcs_write_seq_static(ctx,0x00,0xD5);
 	focaltech_dcs_write_seq_static(ctx,0xCB,0x83,0x00,0x83,0x83,0x00,0x83,0x83,0x00,0x83,0x83,0x00);
+
 	focaltech_dcs_write_seq_static(ctx,0x00,0xE0);
 	focaltech_dcs_write_seq_static(ctx,0xCB,0x83,0x83,0x00,0x83,0x83,0x00,0x83,0x83,0x00,0x83,0x83,0x00,0x83);
+
 	//panel mapping setting
 	//u2d_L
 	focaltech_dcs_write_seq_static(ctx,0x00,0x80);
 	focaltech_dcs_write_seq_static(ctx,0xCC,0x2C,0x29,0x26,0x26,0x23,0x23,0x18,0x17,0x16,0x1b,0x1a,0x19,0x24,0x07,0x06,0x09);
+
 	focaltech_dcs_write_seq_static(ctx,0x00,0x90);
 	focaltech_dcs_write_seq_static(ctx,0xCC,0x08,0x01,0x25,0x25,0x26,0x22,0x03,0x02);
 	//u2d_R
 	focaltech_dcs_write_seq_static(ctx,0x00,0x80);
 	focaltech_dcs_write_seq_static(ctx,0xCD,0x2C,0x29,0x26,0x26,0x23,0x23,0x18,0x17,0x16,0x1b,0x1a,0x19,0x24,0x07,0x06,0x09);
+
 	focaltech_dcs_write_seq_static(ctx,0x00,0x90);
 	focaltech_dcs_write_seq_static(ctx,0xCD,0x08,0x01,0x25,0x25,0x26,0x22,0x03,0x02);
 	//d2u_L
 	focaltech_dcs_write_seq_static(ctx,0x00,0xA0);
 	focaltech_dcs_write_seq_static(ctx,0xCC,0x2C,0x29,0x26,0x26,0x23,0x23,0x18,0x17,0x16,0x1b,0x1a,0x19,0x24,0x08,0x09,0x06);
+
 	focaltech_dcs_write_seq_static(ctx,0x00,0xB0);
 	focaltech_dcs_write_seq_static(ctx,0xCC,0x07,0x01,0x25,0x25,0x22,0x26,0x02,0x03);
+
 	//d2u_R
 	focaltech_dcs_write_seq_static(ctx,0x00,0xA0);
 	focaltech_dcs_write_seq_static(ctx,0xCD,0x2C,0x29,0x26,0x26,0x23,0x23,0x18,0x17,0x16,0x1b,0x1a,0x19,0x24,0x08,0x09,0x06);
+
 	focaltech_dcs_write_seq_static(ctx,0x00,0xB0);
 	focaltech_dcs_write_seq_static(ctx,0xCD,0x07,0x01,0x25,0x25,0x22,0x26,0x02,0x03);
+	//==============================================
+
 	//ckh
 	focaltech_dcs_write_seq_static(ctx,0x00,0x86);//Normal
 	focaltech_dcs_write_seq_static(ctx,0xC0,0x01,0x02,0x01,0x00,0x10,0x10,0x10,0x03);
@@ -413,16 +429,16 @@ static void focaltech_panel_init(struct focaltech_lcm *ctx)
 	focaltech_dcs_write_seq_static(ctx,0xD8,0x2F,0x27);
 
 	//VCOM=-0.2V
-	focaltech_dcs_write_seq_static(ctx,0x00,0x00);
-	focaltech_dcs_write_seq_static(ctx,0xD9,0x23,0x23,0x23,0x23);
-	focaltech_dcs_write_seq_static(ctx,0x00,0x06);
-	focaltech_dcs_write_seq_static(ctx,0xD9,0x23,0x23,0x23);
+	//focaltech_dcs_write_seq_static(ctx,0x00,0x00);
+	//focaltech_dcs_write_seq_static(ctx,0xD9,0x23,0x23,0x23,0x23);
+	//focaltech_dcs_write_seq_static(ctx,0x00,0x06);
+	//focaltech_dcs_write_seq_static(ctx,0xD9,0x23,0x23,0x23);
 
 	focaltech_dcs_write_seq_static(ctx,0x00,0x87);
 	focaltech_dcs_write_seq_static(ctx,0xC4,0x08,0x08);
 
 	//CKH Rotate	
-	//0x03£ºRGBBGR  0x10£ºRGBRGB
+	//0x03：RGBBGR  0x10：RGBRGB
 	focaltech_dcs_write_seq_static(ctx,0x00,0x80);
 	focaltech_dcs_write_seq_static(ctx,0xA7,0x03);		
 
@@ -432,7 +448,8 @@ static void focaltech_panel_init(struct focaltech_lcm *ctx)
 
 	focaltech_dcs_write_seq_static(ctx,0x00,0xB1);			
 	focaltech_dcs_write_seq_static(ctx,0xF5,0x1F);
-
+	//C0CB[7:4]=PONBLANK=1= 2 FRAME
+	//C0CB[3:0]=POFBLANK=1= 2 FRAME
 	focaltech_dcs_write_seq_static(ctx,0x00,0xCB);
 	focaltech_dcs_write_seq_static(ctx,0xC0,0x01);
 
@@ -463,7 +480,7 @@ static void focaltech_panel_init(struct focaltech_lcm *ctx)
 	focaltech_dcs_write_seq_static(ctx,0xF5,0x00);
 
 	focaltech_dcs_write_seq_static(ctx,0x00,0xB0);
-	focaltech_dcs_write_seq_static(ctx,0xC5,0x10,0x4A,0x01,0x1F,0x4A,0x00);//fw qÈ«Çý 8725 ÆäËû¿Í‘ô
+	focaltech_dcs_write_seq_static(ctx,0xC5,0x10,0x4A,0x01,0x1F,0x4A,0x00);//fw q全驱 8725 其他客戶
 
 	focaltech_dcs_write_seq_static(ctx,0x00,0xA0);
 	focaltech_dcs_write_seq_static(ctx,0xB0,0x00,0x00,0x00,0x00,0x00,0x1D,0x01); 
@@ -531,13 +548,13 @@ static void focaltech_panel_init(struct focaltech_lcm *ctx)
 	focaltech_dcs_write_seq_static(ctx,0xC5,0x04);
 	//TP noise end
 
-	//SPIÂý°ëÅÄ
+	//SPI慢半拍
 	focaltech_dcs_write_seq_static(ctx,0x00,0x0E);
 	focaltech_dcs_write_seq_static(ctx,0xF3,0x80,0xFF);
-	//¹ØRTN²¹³¥
+	//关RTN补偿
 	focaltech_dcs_write_seq_static(ctx,0x00,0xE0);
 	focaltech_dcs_write_seq_static(ctx,0xCE,0x00);
-	//CKH²¹³¥off
+	//CKH补偿off
 	focaltech_dcs_write_seq_static(ctx,0x00,0xFC);
 	focaltech_dcs_write_seq_static(ctx,0xC0,0x00,0x17);
 
@@ -554,7 +571,9 @@ static void focaltech_panel_init(struct focaltech_lcm *ctx)
 	focaltech_dcs_write_seq_static(ctx,0x00,0x83); //packet loss cover 
 	focaltech_dcs_write_seq_static(ctx,0xB0,0x63);
 
-
+	//EQ
+	//focaltech_dcs_write_seq_static(ctx,0x00,0x80);
+	//focaltech_dcs_write_seq_static(ctx,0xC3,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00);
 	//CHOP
 	focaltech_dcs_write_seq_static(ctx,0x00,0x81);
 	focaltech_dcs_write_seq_static(ctx,0xA4,0x23,0x23);
@@ -564,16 +583,31 @@ static void focaltech_panel_init(struct focaltech_lcm *ctx)
 	focaltech_dcs_write_seq_static(ctx,0x00,0x82);
 	focaltech_dcs_write_seq_static(ctx,0xCE,0x17,0x17);
 
-	focaltech_dcs_write_seq_static(ctx,0x00, 0x8C);
-	focaltech_dcs_write_seq_static(ctx,0xC3, 0x02, 0x00, 0x20);
+	//OSC trim
+	//focaltech_dcs_write_seq_static(ctx,0x00,0x84);
+	//focaltech_dcs_write_seq_static(ctx,0xF4,0x42);
+	//LCD BUSY
+	//focaltech_dcs_write_seq_static(ctx,0x00,0x80);
+	//focaltech_dcs_write_seq_static(ctx,0xF6,0x69,0x10);
 
-
-	focaltech_dcs_write_seq_static(ctx,0x00, 0xC1);
-	focaltech_dcs_write_seq_static(ctx,0xC5, 0x55, 0x55);
-	focaltech_dcs_write_seq_static(ctx,0x00, 0xC4);
-	focaltech_dcs_write_seq_static(ctx,0xC5, 0xf0, 0xf0, 0x55);
+	//focaltech_dcs_write_seq_static(ctx,0x00,0x80);
+	//focaltech_dcs_write_seq_static(ctx,0xF6,0x69,0x0B,0x80,0x80);
+	//focaltech_dcs_write_seq_static(ctx,0x00,0x82);
+	//focaltech_dcs_write_seq_static(ctx,0xCB,0x05);
+	//focaltech_dcs_write_seq_static(ctx,0x00,0x88);
+	//focaltech_dcs_write_seq_static(ctx,0xC2,0xC2,0x90,0x00,0x02,0x8B);
 
 	focaltech_dcs_write_seq_static(ctx,0x35,0x00);
+	//drv modify Slice Height 8 start
+	focaltech_dcs_write_seq_static(ctx,0x00,0xB0);
+	focaltech_dcs_write_seq_static(ctx,0xB4,0x00,0x08,0x02,0x00,0x00,0xbb,0x00,0x07,0x0d,0xb7,0x0c,0xb7,0x10,0xf0);
+	//drv modify Slice Height 8 end
+	//focaltech_dcs_write_seq_static(ctx,0x1C,0x02);
+
+	//CMD2 disable
+	//focaltech_dcs_write_seq_static(ctx,0x00,0x00); 
+	//focaltech_dcs_write_seq_static(ctx,0xFF,0xFF,0xFF,0xFF);
+	//----------------------LCD initial code End----------------------//			
 	focaltech_dcs_write_seq_static(ctx, 0x11,0x00);
 	msleep(120);
 	focaltech_dcs_write_seq_static(ctx, 0x29,0x00);
@@ -598,7 +632,7 @@ static int focaltech_disable(struct drm_panel *panel)
 	return 0;
 }
 //drv-Entering deep sleep to solve the problem of electricity leakage-pzp-20240701-start
-void focaltech_deep_slepp(struct focaltech_lcm *ctx)
+/*void focaltech_deep_slepp(struct focaltech_lcm *ctx)
 {
 	focaltech_dcs_write_seq_static(ctx, 0x00,0x00);
 	focaltech_dcs_write_seq_static(ctx, 0xFF,0x87,0x25,0x01); 
@@ -606,7 +640,7 @@ void focaltech_deep_slepp(struct focaltech_lcm *ctx)
 	focaltech_dcs_write_seq_static(ctx, 0xFF,0x87,0x25);
 	focaltech_dcs_write_seq_static(ctx, 0x00,0x00);
 	focaltech_dcs_write_seq_static(ctx, 0xF7,0x5A,0xA5,0x95,0x27);
-}
+}*/
 //drv-Entering deep sleep to solve the problem of electricity leakage-pzp-20240701-end
 static int focaltech_unprepare(struct drm_panel *panel)
 {
@@ -623,13 +657,15 @@ static int focaltech_unprepare(struct drm_panel *panel)
 	focaltech_dcs_write_seq_static(ctx, MIPI_DCS_ENTER_SLEEP_MODE);
 	msleep(150);
 //drv Added the double-click wake up function-pzp-20240817-start
+#if IS_ENABLED(CONFIG_PRIZE_COMMON_NODE)
 	if(!fts_gesture_status())	
 	{
+#endif
 		//drv-Entering deep sleep to solve the problem of electricity leakage-pzp-20240701-start
-		focaltech_deep_slepp(ctx);
+		//focaltech_deep_slepp(ctx);
 	//drv-Entering deep sleep to solve the problem of electricity leakage-pzp-20240701-end
 	ctx->reset_gpio = devm_gpiod_get(ctx->dev, "reset", GPIOD_OUT_HIGH);
-	gpiod_set_value(ctx->reset_gpio, 0);
+	gpiod_set_value(ctx->reset_gpio, 1);
 	devm_gpiod_put(ctx->dev, ctx->reset_gpio);
 
 	ctx->amoled_vddi_en_gpio = devm_gpiod_get(ctx->dev, "enp-en", GPIOD_OUT_HIGH);
@@ -639,7 +675,9 @@ static int focaltech_unprepare(struct drm_panel *panel)
 		ctx->amoled_vdd_en_gpio = devm_gpiod_get(ctx->dev, "enn-en", GPIOD_OUT_HIGH);
 		gpiod_set_value(ctx->amoled_vdd_en_gpio, 0);
 		devm_gpiod_put(ctx->dev, ctx->amoled_vdd_en_gpio);
+#if IS_ENABLED(CONFIG_PRIZE_COMMON_NODE)
 	}
+#endif
 //drv Added the double-click wake up function-pzp-20240817-end
 	ctx->hbm_en = false;
 	ctx->doze_en = false;//drv-Fixed the issue of entering aod and TP having touch-pengzhipeng-20230516
@@ -712,19 +750,21 @@ static int focaltech_enable(struct drm_panel *panel)
 
 #define FRAME_WIDTH                 1080
 #define FRAME_HEIGHT                2408
-#define PHYSICAL_WIDTH              69552
-#define PHYSICAL_HEIGHT             154560
+//drv-Added the physical size of the screen-pzp-20240829-start
+#define PHYSICAL_WIDTH              68430   
+#define PHYSICAL_HEIGHT             152570 
+//drv-Added the physical size of the screen-pzp-20240829-end
 
 #define HFP (92)//drv Modify proch and clk to solve the underflow problem-pzp-20240701
 #define HSA (20)
-#define HBP (70)
+#define HBP (56)
 #define HACT (1080)
-#define VFP (2470)
+#define VFP (2528)
 #define VSA (4)
 #define VBP (12)
 #define VACT (2408)
-#define VFP_90 (839)
-#define VFP_120 (27)
+#define VFP_90 (877)
+#define VFP_120 (51)
 
 #define PCLK_IN_KHZ_60HZ \
     ((HACT+HFP+HSA+HBP)*(VACT+VFP+VSA+VBP)*(60)/1000)
@@ -771,18 +811,31 @@ static const struct drm_display_mode switch_mode_60hz = {
 
 static struct mtk_panel_params ext_params_120hz = {
 	//drv Modify proch and clk to solve the underflow problem-pzp-20240701-start
-	.pll_clk = 550,
-    .data_rate = 1100,
+	.pll_clk = 545,
+    .data_rate = 1090,
 //drv Modify proch and clk to solve the underflow problem-pzp-20240701-end
 	.physical_width_um = PHYSICAL_WIDTH,
     .physical_height_um = PHYSICAL_HEIGHT,
 	.cust_esd_check = 1,
 	.esd_check_enable = 1,
+	//drv Solve the problem of blurred screens and black screens when playing esd -20240830-start
 	.lcm_esd_check_table[0] = {
 		.cmd = 0x0A,
 		.count = 1,
 		.para_list[0] = 0x9c,
 	},
+	.lcm_esd_check_table[1] = {
+		.cmd = 0xAC,
+		.count = 1,
+		.para_list[0] = 0x00,
+	},
+	
+	.lcm_esd_check_table[2] = {
+		.cmd = 0x05,
+		.count = 1,	
+		.para_list[0] = 0x00,
+	},
+	//drv Solve the problem of blurred screens and black screens when playing esd -20240830-end
 	.ssc_enable = 0,
     .output_mode = MTK_PANEL_DSC_SINGLE_PORT,
 	.dsc_params = {
@@ -825,18 +878,31 @@ static struct mtk_panel_params ext_params_120hz = {
 
 static struct mtk_panel_params ext_params_90hz = {
 	//drv Modify proch and clk to solve the underflow problem-pzp-20240701-start
-	.pll_clk = 550,
-    .data_rate = 1100,
+	.pll_clk = 545,
+    .data_rate = 1090,
 //drv Modify proch and clk to solve the underflow problem-pzp-20240701-end
 	.physical_width_um = PHYSICAL_WIDTH,
     .physical_height_um = PHYSICAL_HEIGHT,
 	.cust_esd_check = 1,
 	.esd_check_enable = 1,
+	//drv Solve the problem of blurred screens and black screens when playing esd -20240830-start
 	.lcm_esd_check_table[0] = {
 		.cmd = 0x0A,
 		.count = 1,
 		.para_list[0] = 0x9c,
 	},
+	.lcm_esd_check_table[1] = {
+		.cmd = 0xAC,
+		.count = 1,
+		.para_list[0] = 0x00,
+	},
+	
+	.lcm_esd_check_table[2] = {
+		.cmd = 0x05,
+		.count = 1,	
+		.para_list[0] = 0x00,
+	},
+	//drv Solve the problem of blurred screens and black screens when playing esd -20240830-end
 	.ssc_enable = 0,
     .output_mode = MTK_PANEL_DSC_SINGLE_PORT,
 	.dsc_params = {
@@ -879,18 +945,31 @@ static struct mtk_panel_params ext_params_90hz = {
 
 static struct mtk_panel_params ext_params_60hz = {
 //drv Modify proch and clk to solve the underflow problem-pzp-20240701-start
-	.pll_clk = 550,
-    .data_rate = 1100,
+	.pll_clk = 545,
+    .data_rate = 1090,
 //drv Modify proch and clk to solve the underflow problem-pzp-20240701-end
 	.physical_width_um = PHYSICAL_WIDTH,
     .physical_height_um = PHYSICAL_HEIGHT,
 	.cust_esd_check = 1,
 	.esd_check_enable = 1,
+	//drv Solve the problem of blurred screens and black screens when playing esd -20240830-start
 	.lcm_esd_check_table[0] = {
 		.cmd = 0x0A,
 		.count = 1,
 		.para_list[0] = 0x9c,
 	},
+	.lcm_esd_check_table[1] = {
+		.cmd = 0xAC,
+		.count = 1,
+		.para_list[0] = 0x00,
+	},
+	
+	.lcm_esd_check_table[2] = {
+		.cmd = 0x05,
+		.count = 1,	
+		.para_list[0] = 0x00,
+	},
+	//drv Solve the problem of blurred screens and black screens when playing esd -20240830-end
 	.ssc_enable = 0,
     .output_mode = MTK_PANEL_DSC_SINGLE_PORT,
 	.dsc_params = {
@@ -959,13 +1038,9 @@ static int panel_ext_reset(struct drm_panel *panel, int on)
 {
 	struct focaltech_lcm *ctx = panel_to_lcm(panel);
 
-	ctx->reset_gpio = devm_gpiod_get(ctx->dev, "reset", GPIOD_OUT_HIGH);
-	gpiod_set_value(ctx->reset_gpio, 1);
-	usleep_range(10000, 10001);
-	gpiod_set_value(ctx->reset_gpio, 0);
-	usleep_range(10000, 10001);
-	gpiod_set_value(ctx->reset_gpio, 1);
-	usleep_range(50000, 50001);
+	ctx->reset_gpio =
+		devm_gpiod_get(ctx->dev, "reset", GPIOD_OUT_HIGH);
+	gpiod_set_value(ctx->reset_gpio, on);
 	devm_gpiod_put(ctx->dev, ctx->reset_gpio);
 	
 	return 0;

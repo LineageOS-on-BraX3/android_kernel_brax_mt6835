@@ -149,12 +149,14 @@
 		};
 	};
 	panel3@2 {
-		compatible = "jdi,nt36672e,cphy,vdo,wo,dsc,hfp";
+		compatible = "huashi,ili9883,vdo";
 		reg = <2>;
-		pm-enable-gpios = <&pio 150 0>;
+		pm-enable-gpios = <&pio 43 0>;
 		reset-gpios = <&pio 86 0>;
-		cphy-sel-gpios = <&pio 133 0>;
+		bias-gpios = <&pio 150 0>,
+				<&pio 151 0>;
 		gate-ic = <4831>;
+		lcd_vdd-supply = <&mt6377_vaud18>;
 		pinctrl-names = "default";
 		port {
 			panel_in3: endpoint {
@@ -457,20 +459,38 @@
 	};
 };
 
-// prieze add by chenwenhui 20240601 start
-&i2c8 {
-	spc@40 {
-		compatible = "prize,spc_r";
-		reg = <0x40>;
-		pdn_pin = <&pio 23 0>;
-		rst_pin = <&pio 28 0>;
-		sensor_id = <0x6133>;
-		sensor_type = <0x6133>;
-		vcama-gpio = <&pio 59 0>;
-		//vcamd-gpio = <&pio 34 0>;
-	};
+
+// pri add sumsang NFC
+&i2c3  {
+  #address-cells = <1>;
+  #size-cells = <0>;
+  clock-frequency = <400000>;
+  status = "okay";
+
+  sec-nfc@27 {
+    compatible = "sec-nfc";
+    reg = <0x27>;
+
+    sec-nfc,ven-gpio = <&pio 36 0>;
+    sec-nfc,firm-gpio = <&pio 37 0>;
+    sec-nfc,irq-gpio = <&pio 8 0xf>;
+#ifdef CONFIG_SEC_NFC_GPIO_CLK
+    sec-nfc,clk_req-gpio = <&pio 3 0>;
+#endif
+#ifdef CONFIG_SEC_NFC_PMIC_LDO
+    sec-nfc,pmic-ldo = "vdd_ldo20";
+#endif
+#ifdef CONFIG_SEC_NFC_DEDICATED_CLK
+    clkctrl-reg = <0x10e60a0c>;
+#endif
+#ifdef CONFIG_SEC_NFC_GPIO_CLK
+    clock-names = "OSC_NFC";
+    clocks = <&clock OSC_NFC>;
+#endif
+    //pinctrl-names = "default";
+    //pinctrl-0 = <&xclkout1 &nfc_pd &nfc_clkreq>;
+  };
 };
-// prieze add by chenwenhui 20240601 end
 
 #include <k6835v1_64/cust.dtsi>
 /*End of this file, DO NOT ADD ANYTHING HERE*/

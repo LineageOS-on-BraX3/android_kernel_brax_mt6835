@@ -142,9 +142,6 @@ source "drivers/misc/mediatek/conn_md/Kconfig"
 source "drivers/misc/mediatek/uarthub/Kconfig"
 source "drivers/misc/mediatek/conn_scp/Kconfig"
 source "drivers/misc/mediatek/nfc/Kconfig"
-#drv add by yaozhipeng 20230921 start
-source "drivers/misc/mediatek/nfc_tms/Kconfig"
-#drv add by yaozhipeng 20230921 end
 source "drivers/misc/mediatek/memory-amms/Kconfig"
 source "drivers/misc/mediatek/mddp/Kconfig"
 endmenu # Modem
@@ -164,6 +161,7 @@ source "drivers/misc/mediatek/sensor/Kconfig"
 source "drivers/misc/mediatek/gate_ic/Kconfig"
 source "drivers/misc/mediatek/usb/Kconfig"
 source "drivers/misc/mediatek/lcd_bias/Kconfig"
+source "drivers/misc/mediatek/samsung/Kconfig"
 endmenu # Other Peripheral
 
 menu "Performance"
@@ -214,14 +212,5 @@ config FPGA_EARLY_PORTING
 	  platform and non-FPGA platform.
 	  Say Y here if you are doing FPGA early porting.
 	  If unsure, say N
-#drv add by yaozhipeng 20230607 start
-config TMS_CHIP_SUPPORT
-	tristate "tms nfc"
-	default n
-	help
-	  hardware_info. If configures to be n, means devices doesn't support
-	  hardwareinfo functionality.
-	  
-#drv add by yaozhipeng 20230607 end 
 endmenu # Misc
 

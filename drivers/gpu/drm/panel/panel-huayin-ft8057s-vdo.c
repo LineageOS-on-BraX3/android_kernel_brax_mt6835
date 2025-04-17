@@ -135,7 +135,7 @@ static int lcm_panel_lcd_vdd_18_regulator_init(struct device *dev)
 		printk("[%s] get vdd regulator failed,ret=%d", __func__, ret);
 		return ret;
 	}
-	
+
 	if (regulator_count_voltages(lcd_vdd_18) > 0) {
 		ret = regulator_set_voltage(lcd_vdd_18, 1800000, 1800000);
 		if (ret) {
@@ -144,7 +144,7 @@ static int lcm_panel_lcd_vdd_18_regulator_init(struct device *dev)
 			return ret;
 		}
 	}
-	
+
 	printk("%s OK!!!\n", __func__);
 	return 0;
 }
@@ -155,7 +155,7 @@ static void lcd_vdd_18_enable(void)
 	if (ret < 0)
 		printk("[%s]regulator lcd_vdd_18 fail, ret = %d\n",  __func__,ret);
 }
- 
+
 void lcd_vdd_18_disable(void)
 {
 	int ret = 0;
@@ -180,7 +180,7 @@ static void lcm_panel_init(struct lcm *ctx)
 //----------------------LCD initial code Start----------------------//
 //--------------CMD WR enable--------------//
 lcm_dcs_write_seq_static(ctx,0x00,0x00);
-lcm_dcs_write_seq_static(ctx,0xFF,0x80,0x57,0x01); 
+lcm_dcs_write_seq_static(ctx,0xFF,0x80,0x57,0x01);
 lcm_dcs_write_seq_static(ctx,0x00,0x80);
 lcm_dcs_write_seq_static(ctx,0xFF,0x80,0x57);
 
@@ -198,52 +198,52 @@ lcm_dcs_write_seq_static(ctx,0xC5,0x61);
 lcm_dcs_write_seq_static(ctx,0x00,0x9A);//VGL_N -12V,x3 pump
 lcm_dcs_write_seq_static(ctx,0xC5,0xC1);
 
-lcm_dcs_write_seq_static(ctx,0x00,0x9C);//VGL_I -12V,x3 pump 
+lcm_dcs_write_seq_static(ctx,0x00,0x9C);//VGL_I -12V,x3 pump
 lcm_dcs_write_seq_static(ctx,0xC5,0xC1);
 
 lcm_dcs_write_seq_static(ctx,0x00,0xB6); //VGHO1_N_I=15V
 lcm_dcs_write_seq_static(ctx,0xC5,0x4D,0x4D);
 
 lcm_dcs_write_seq_static(ctx,0x00,0xB8); //VGLO1_N_I -11V
-lcm_dcs_write_seq_static(ctx,0xC5,0x37,0x37); 
+lcm_dcs_write_seq_static(ctx,0xC5,0x37,0x37);
 
-lcm_dcs_write_seq_static(ctx,0x00,0x00);  
+lcm_dcs_write_seq_static(ctx,0x00,0x00);
 lcm_dcs_write_seq_static(ctx,0xD8,0x2B,0x2B);  //GVDDP/N 5.0V/-5.0V
 
 //lcm_dcs_write_seq_static(ctx,0x00,0x00);
 //lcm_dcs_write_seq_static(ctx,0xD9,0x00, 0x73);  //VCOM(-1.0V)
 
 //lcm_dcs_write_seq_static(ctx,0x00,0x07);
-//lcm_dcs_write_seq_static(ctx,0xD9,0x00,0x73,0x73,0x73);  //VCOM(-1.0V) 
+//lcm_dcs_write_seq_static(ctx,0xD9,0x00,0x73,0x73,0x73);  //VCOM(-1.0V)
 //lcm_dcs_write_seq_static(ctx,0xD9,0x00,0x7B,0x7B,0x7B);  //VCOM(-1.0V)
 
-lcm_dcs_write_seq_static(ctx,0x00,0x82); 
+lcm_dcs_write_seq_static(ctx,0x00,0x82);
 lcm_dcs_write_seq_static(ctx,0xC5,0x55);  //LVD
 
-lcm_dcs_write_seq_static(ctx,0x00,0x83); 
+lcm_dcs_write_seq_static(ctx,0x00,0x83);
 lcm_dcs_write_seq_static(ctx,0xC5,0x07);  //LVD Enable
 
 //Vgh_s_sel>>vgh 眏
 lcm_dcs_write_seq_static(ctx,0x00,0x96);
 lcm_dcs_write_seq_static(ctx,0xF5,0x0D);
- 
+
 //Vgl_s_sel>>vgl 眏
 lcm_dcs_write_seq_static(ctx,0x00,0x86);
 lcm_dcs_write_seq_static(ctx,0xF5,0x0D);
- 
+
 // VGH CLK Line Rate(1 Line)
 lcm_dcs_write_seq_static(ctx,0x00,0x94);
 lcm_dcs_write_seq_static(ctx,0xC5,0x15);
- 
+
 // VGL CLK Line Rate(1 Line)
 lcm_dcs_write_seq_static(ctx,0x00,0x9B);
 lcm_dcs_write_seq_static(ctx,0xC5,0x51);
 
 lcm_dcs_write_seq_static(ctx,0x00,0xA3);  //GVDD_EN
-lcm_dcs_write_seq_static(ctx,0xA5,0x04); 
+lcm_dcs_write_seq_static(ctx,0xA5,0x04);
 
-lcm_dcs_write_seq_static(ctx,0x00,0x99);  
-lcm_dcs_write_seq_static(ctx,0xCF,0x56); 
+lcm_dcs_write_seq_static(ctx,0x00,0x99);
+lcm_dcs_write_seq_static(ctx,0xCF,0x56);
 
 //--------------Gamma setting--------------//
 lcm_dcs_write_seq_static(ctx,0x00,0x00);
@@ -422,7 +422,7 @@ lcm_dcs_write_seq_static(ctx,0x00,0xEF);
 lcm_dcs_write_seq_static(ctx,0xCB,0x00);
 
 
-//STV1 
+//STV1
 lcm_dcs_write_seq_static(ctx,0x00,0x68);
 lcm_dcs_write_seq_static(ctx,0xC2,0x8A,0x09,0xC3,0xB6);
 //STV2
@@ -529,7 +529,7 @@ lcm_dcs_write_seq_static(ctx,0xA4,0xB6);
 lcm_dcs_write_seq_static(ctx,0x00,0x95);//VB pch data
 lcm_dcs_write_seq_static(ctx,0xC4,0x80);
 //--------------Power on&off--------------//
-lcm_dcs_write_seq_static(ctx,0x00,0xCA);//Power on 3 
+lcm_dcs_write_seq_static(ctx,0x00,0xCA);//Power on 3
 lcm_dcs_write_seq_static(ctx,0xC0,0x90,00);
 
 lcm_dcs_write_seq_static(ctx,0x00,0xB7);//sd_en_sdpl_sel
@@ -545,7 +545,7 @@ lcm_dcs_write_seq_static(ctx,0x00,0x94);//VGHO1 power on
 lcm_dcs_write_seq_static(ctx,0xF5,0x11);
 
 //---------sleep in allgateon-------//
-lcm_dcs_write_seq_static(ctx,0x00,0xB0); 
+lcm_dcs_write_seq_static(ctx,0x00,0xB0);
 lcm_dcs_write_seq_static(ctx,0xC5,0x00);
 
 lcm_dcs_write_seq_static(ctx,0x00,0xB3);
@@ -594,7 +594,7 @@ lcm_dcs_write_seq_static(ctx,0xCE,0x00 ,0xF4 ,0x00 ,0xF4);
 lcm_dcs_write_seq_static(ctx,0x00,0x86);//I2C EN
 lcm_dcs_write_seq_static(ctx,0xB7,0x80);
 
-lcm_dcs_write_seq_static(ctx,0x00,0xA5);  
+lcm_dcs_write_seq_static(ctx,0x00,0xA5);
 lcm_dcs_write_seq_static(ctx,0xB0,0x1D); //RC delay 95ns
 
 //--------------Temp compensation--------------//
@@ -603,7 +603,7 @@ lcm_dcs_write_seq_static(ctx,0xB0,0x1D); //RC delay 95ns
 //lcm_dcs_write_seq_static(ctx,0x00,0xD2);
 //lcm_dcs_write_seq_static(ctx,0xC5,0x11);
 
-//H temp setting = 60C 
+//H temp setting = 60C
 //lcm_dcs_write_seq_static(ctx,0x00,0xE0);
 //lcm_dcs_write_seq_static(ctx,0xC5,0x3C,0x3C);
 
@@ -625,7 +625,7 @@ lcm_dcs_write_seq_static(ctx,0xC5,0x3A);
 lcm_dcs_write_seq_static(ctx,0x00,0xC0); //SR
 lcm_dcs_write_seq_static(ctx,0xC5,0xF0,0xCC,0xCC);
 
-//lcm_dcs_write_seq_static(ctx,0x00,0xE8); 
+//lcm_dcs_write_seq_static(ctx,0x00,0xE8);
 //lcm_dcs_write_seq_static(ctx,0xC0,0x50);//Backward Scan
 
 
@@ -635,13 +635,13 @@ lcm_dcs_write_seq_static(ctx,0x00,0x90);//gm_chop
 lcm_dcs_write_seq_static(ctx,0xE9,0x10);
 //--------------CMD WR Disable--------------//
 lcm_dcs_write_seq_static(ctx,0x00,0x00);
-lcm_dcs_write_seq_static(ctx,0xFF,0x00,0x00,0x00); 
+lcm_dcs_write_seq_static(ctx,0xFF,0x00,0x00,0x00);
 
 lcm_dcs_write_seq_static(ctx,0x00,0x80);
 lcm_dcs_write_seq_static(ctx,0xFF,0x00,0x00);
 
 //----------------------LCD initial code End----------------------//
-	
+
 	lcm_dcs_write_seq_static(ctx,0x11,0x00);
 	mdelay(120);
 	lcm_dcs_write_seq_static(ctx,0x29,0x00);
@@ -1145,7 +1145,7 @@ static int lcm_probe(struct mipi_dsi_device *dsi)
 		return PTR_ERR(ctx->bias_neg);
 	}
 	devm_gpiod_put(dev, ctx->bias_neg);
-	
+
 	lcm_panel_lcd_vdd_18_regulator_init(dev);
 	lcd_vdd_18_enable();
 
