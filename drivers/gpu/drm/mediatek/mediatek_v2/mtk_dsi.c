@@ -51,6 +51,11 @@
 #include "mtk_drm_ddp.h"
 #include "platform/mtk_drm_platform.h"
 #include "mtk_drm_trace.h"
+#include <linux/of_gpio.h>
+#include <linux/gpio.h>
+
+int g_tp_rest_gpio = 0;
+EXPORT_SYMBOL_GPL(g_tp_rest_gpio);
 
 /* ************ Panel Master ********** */
 #include "mtk_fbconfig_kdebug.h"
@@ -366,6 +371,7 @@
 #define DSI_DBG_FLD_ROI_Y	REG_FLD_MSB_LSB(28, 16)
 
 struct phy;
+char g_lcm_vendor_name[128] = {0};
 
 unsigned int data_phy_cycle;
 struct mtk_dsi;
@@ -3954,6 +3960,42 @@ static void mtk_dsi_encoder_mode_set(struct drm_encoder *encoder,
 	mtk_dsi_mode_set(dsi, adjusted);
 	if (dsi->slave_dsi)
 		mtk_dsi_mode_set(dsi->slave_dsi, adjusted);
+}
+
+unsigned int ilitek_tp_rst = 0;
+EXPORT_SYMBOL(ilitek_tp_rst);
+
+static int ilitek_tp_gpio_init(struct device *dev)
+{
+	struct device_node *np = dev->of_node;
+	enum of_gpio_flags rst_flags;
+	int ret = 0;
+
+	if(!dev) {
+		printk("[%s] dev is null\n",__func__);
+		return -1;
+	}
+
+	ilitek_tp_rst = of_get_named_gpio_flags(np, "touch,reset-gpio", 0, &rst_flags);
+	if (ilitek_tp_rst < 0) {
+        printk("[%s][ERR]Unable to get ilitek_tp_rst\n", __func__);
+		return -1;
+	}
+
+	printk("[ilitek_tp_rst:%d]\n",ilitek_tp_rst);
+
+    /* request reset gpio */
+    if (gpio_is_valid(ilitek_tp_rst)) {
+        ret = gpio_request(ilitek_tp_rst, "TP_RESET");
+        if (ret) {
+            printk("[GPIO]ilitek_tp_rst request failed");
+            gpio_free(ilitek_tp_rst);
+			return -1;
+        }
+    }
+
+	printk("[%s] set ilitek tp_rst gpio OK !!!\n", __func__);
+	return 0;
 }
 
 static void mtk_dsi_encoder_disable(struct drm_encoder *encoder)
@@ -10629,6 +10671,31 @@ static const struct of_device_id mtk_dsi_of_match[] = {
 	{},
 };
 
+int mtk_dsi_get_vendor_id(void)
+{
+	int lcmVendorId = 0;
+
+	if (!strcmp(g_lcm_vendor_name,"panel-huike-ili9883-vdo"))
+	{
+		lcmVendorId = 1;
+	}
+	else if (!strcmp(g_lcm_vendor_name,"panel-huayin-ft8057s-vdo"))
+	{
+		lcmVendorId = 2;
+	}
+	else if (!strcmp(g_lcm_vendor_name,"panel-huashi-ili9883-vdo"))
+	{
+		lcmVendorId = 1;
+	}
+	else if (!strcmp(g_lcm_vendor_name,"panel-truly-td4160c-vdo-90hz")) 
+	{
+		lcmVendorId = 1;
+	}
+
+	return lcmVendorId;
+}
+EXPORT_SYMBOL_GPL(mtk_dsi_get_vendor_id);
+
 static int mtk_dsi_probe(struct platform_device *pdev)
 {
 	struct mtk_dsi *dsi;
@@ -10824,7 +10891,12 @@ static int mtk_dsi_probe(struct platform_device *pdev)
 
 		goto error;
 	}
+	memcpy(g_lcm_vendor_name,(void *)dsi->panel->dev->driver->name,strlen((void *)dsi->panel->dev->driver->name));
+	printk("g_lcm_vendor_name =[%s].\n", g_lcm_vendor_name);
 
+	if (mtk_dsi_get_vendor_id() == 1) {
+		ilitek_tp_gpio_init(&pdev->dev);
+	}
 	DDPINFO("%s-\n", __func__);
 	return ret;
 

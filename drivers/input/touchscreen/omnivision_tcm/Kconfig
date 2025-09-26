@@ -1,0 +1,20 @@
+config TOUCHSCREEN_OMNIVISION_TCM
+	tristate "Omnivision_tcm Touchscreen"
+	default m
+	help
+	Say Y here if you have Omnivision_tcm touch panel.
+	If unsure, say N.
+
+config TOUCHSCREEN_OMNIVISION_TCM_EAR_PHONE
+    tristate "Omnivision TCM earphone mode"
+	help
+	  Say Y here to enable support for open ear mode functionality.
+
+	  If unsure, say N.
+
+config TOUCHSCREEN_OMNIVISION_TCM_CHARGER
+	tristate "Omnivision TCM charger mode"
+	help
+	  Say Y here to enable support for open charger mode functionality.
+
+	  If unsure, say N.

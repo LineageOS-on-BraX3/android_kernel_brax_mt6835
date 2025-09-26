@@ -20,6 +20,17 @@
 #include "../../codecs/mt6377-accdet.h"
 #endif
 #include "../common/mtk-sp-spk-amp.h"
+
+#if IS_ENABLED(CONFIG_SND_SOC_AW87XXX)
+extern int aw87xxx_set_profile(int dev_index, char *profile);
+
+static char *aw_profile[] = {"Music", "Off"};
+
+enum aw87xxx_dev_index {
+	AW_DEV_0 = 0,
+};
+#endif
+
 /*
  * if need additional control for the ext spk amp that is connected
  * after Lineout Buffer / HP Buffer on the codec, put the control in
@@ -87,15 +98,29 @@ static int mt6835_mt6377_spk_amp_event(struct snd_soc_dapm_widget *w,
 {
 	struct snd_soc_dapm_context *dapm = w->dapm;
 	struct snd_soc_card *card = dapm->card;
-
+	int ret = 0;
 	dev_info(card->dev, "%s(), event %d\n", __func__, event);
 
 	switch (event) {
 	case SND_SOC_DAPM_POST_PMU:
 		/* spk amp on control */
+#if IS_ENABLED(CONFIG_SND_SOC_AW87XXX)
+	ret = aw87xxx_set_profile(AW_DEV_0, aw_profile[0]);
+	if (ret < 0) {
+		pr_err("[Awinic] %s: set profile[%s] failed", __func__, aw_profile[0]);
+		return ret;
+	}
+#endif
 		break;
 	case SND_SOC_DAPM_PRE_PMD:
 		/* spk amp off control */
+#if IS_ENABLED(CONFIG_SND_SOC_AW87XXX)
+	ret = aw87xxx_set_profile(AW_DEV_0, aw_profile[1]);
+	if (ret < 0) {
+		pr_err("[Awinic] %s: set profile[%s] failed", __func__, aw_profile[1]);
+		return ret;
+	}
+#endif
 		break;
 	default:
 		break;

@@ -19,10 +19,24 @@
 #include <linux/workqueue.h>
 #include <sound/jack.h>
 #include <sound/soc.h>
+#include <linux/init.h>
+#include <linux/notifier.h>
 
 #include "mt6377-accdet.h"
 #include "mt6377.h"
 
+#if IS_ENABLED(CONFIG_CS_NOTIFIER)
+#if IS_ENABLED(CONFIG_TOUCHSCREEN_OMNIVISION_TCM_EAR_PHONE)
+#include <../../../drivers/misc/mediatek/prize/cs_notifier/cs_notifier.h>
+#endif
+#endif
+
+/*add by xwg for sar detect accdet plug in/out start*/
+extern struct blocking_notifier_head accdet_notifier_chain;
+/*add by xwg for sar detect accdet plug in/out end*/
+/* prize add by zhanghuimin for SN339D-1757 start */
+extern struct blocking_notifier_head ili_earphone_notifier_chain;
+/* prize add by zhanghuimin for SN339D-1757 end */
 /* global variables definition */
 #define REGISTER_VAL(x)	(x - 1)
 #define HAS_CAP(_c, _x)	(((_c) & (_x)) == (_x))
@@ -896,8 +910,16 @@ static void send_status_event(u32 cable_type, u32 status)
 			snd_soc_jack_report(&accdet->jack, report,
 					SND_JACK_MICROPHONE);
 		}
-		pr_info("accdet HEADPHONE(3-pole) %s\n",
+		pr_err("accdet HEADPHONE(3-pole) %s\n",
 			status ? "PlugIn" : "PlugOut");
+
+		/*add by xwg for sar detect accdet plug in/out start*/
+		blocking_notifier_call_chain(&accdet_notifier_chain, status, NULL);
+		/*add by xwg for sar detect accdet plug in/out end*/
+
+		/* prize add by zhanghuimin for SN339D-1757 start */
+		blocking_notifier_call_chain(&ili_earphone_notifier_chain, status, NULL);
+		/* prize add by zhanghuimin for SN339D-1757 end */
 		break;
 	case HEADSET_MIC:
 		/* when plug 4-pole out, 3-pole plug out should also be
@@ -915,8 +937,15 @@ static void send_status_event(u32 cable_type, u32 status)
 
 		snd_soc_jack_report(&accdet->jack, report,
 				SND_JACK_MICROPHONE);
-		pr_info("accdet MICROPHONE(4-pole) %s\n",
+		pr_err("accdet MICROPHONE(4-pole) %s\n",
 			status ? "PlugIn" : "PlugOut");
+
+		/*add by xwg for sar detect accdet plug in/out start*/
+		blocking_notifier_call_chain(&accdet_notifier_chain, status, NULL);
+		/*add by xwg for sar detect accdet plug in/out end*/
+		/* prize add by zhanghuimin for SN339D-1757 start */
+		blocking_notifier_call_chain(&ili_earphone_notifier_chain, status, NULL);
+		/* prize add by zhanghuimin for SN339D-1757 end */
 		/* when press key for a long time then plug in
 		 * even recoginized as 4-pole
 		 * disable micbias timer still timeout after 6s
@@ -1636,6 +1665,11 @@ static void eint_work_callback(struct work_struct *work)
 		accdet_init();
 
 		enable_accdet(0);
+#if IS_ENABLED(CONFIG_CS_NOTIFIER)
+#if IS_ENABLED(CONFIG_TOUCHSCREEN_OMNIVISION_TCM_EAR_PHONE)
+		cs_earphone_notifier_call_chain(EARPHONE_PLUG_IN, NULL);
+#endif
+#endif
 	} else {
 		mutex_lock(&accdet->res_lock);
 		accdet->eint_sync_flag = false;
@@ -1650,6 +1684,11 @@ static void eint_work_callback(struct work_struct *work)
 			ACCDET_SW_EN_SFT);
 		disable_accdet();
 		headset_plug_out();
+#if IS_ENABLED(CONFIG_CS_NOTIFIER)
+#if IS_ENABLED(CONFIG_TOUCHSCREEN_OMNIVISION_TCM_EAR_PHONE)
+		cs_earphone_notifier_call_chain(EARPHONE_PLUG_OUT, NULL);
+#endif
+#endif
 	}
 
 	if (HAS_CAP(accdet->data->caps, ACCDET_PMIC_EINT_IRQ)) {

@@ -1,0 +1,44 @@
+config PRIZE_DRIVER_SUPPORT
+	tristate "STMicroelectronics NFC driver solution"
+	help
+	  STMicroelectronics Near Field Communication controller support.
+	  It is the master switch of STMicroelectronics NFC controller drivers.
+	  If configures to be y, NFC_ST21NFC and NFC_ST54_SPI will be
+	  selected.
+
+config PRIZE_HARDWARE_INFO
+	tristate "hardware_info"
+	default n
+	help
+	  hardware_info. If configures to be n, means devices doesn't support
+	  hardwareinfo functionality.
+
+#DRV added by chenjiaxi, add lpddr 8802 info (for ufs kernel-5.10), start
+config PRIZE_HARDWARE_LPDDR_INFO
+	tristate "hardware lpddr info"
+	default n
+	help
+	  hardware lpddr info. If configures to be n, means devices doesn't support
+	  hardware lpddr info functionality.
+#DRV added by chenjiaxi, add lpddr 8802 info (for ufs kernel-5.10), end
+
+config PRIZE_BOARD_ID
+	tristate "prize board id config"
+	help
+	  Say Y here if you have a board id config and want to enable
+	  support for the built-in board id.
+
+	  If unsure, say N.
+
+config PRIZE_SIM_SLOT_CHECK
+	tristate "sim control switch"
+	default n
+	help
+	  sim control switch. If configures to be n, means devices doesn't support
+	  sim power control functionality.
+
+source "drivers/misc/mediatek/prize/cs_notifier/Kconfig"
+
+# pri added for SL005TC-231 20250610 begin
+source "drivers/misc/mediatek/prize/cs_usb_broadcast/Kconfig"
+# pri added for SL005TC-231 20250610 end

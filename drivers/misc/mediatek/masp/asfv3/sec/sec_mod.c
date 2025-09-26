@@ -138,8 +138,14 @@ static int reboot_handler_set_eio_flag(struct notifier_block *reboot,
 {	int ret = 0;
 	const char *dm_error_cmd = "dm-verity device corrupted";
 
+//pri add for E115,don't write flag to sec,when dm-verity by wutongtong 20251030 start
+	if (cmd)
+		pr_err("[%s] %s (%s) cmd(%s)\n", SEC_DEV_NAME, __func__, dm_error_cmd, (char*)cmd);
+#if 0
 	if (cmd && !strcmp(cmd, dm_error_cmd))
 		ret = masp_hal_set_dm_verity_error();
+#endif
+//pri add for E115,don't write flag to sec,when dm-verity by wutongtong 20251030 end
 	return ret;
 }
 

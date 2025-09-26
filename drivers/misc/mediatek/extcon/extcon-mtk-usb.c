@@ -21,10 +21,18 @@
 #include <linux/proc_fs.h>
 
 #include "extcon-mtk-usb.h"
+/* pri add by liuyong 20231016 start */
+#include "../../../power/supply/mtk_charger.h"
+/* pri add by liuyong 20231016 start */
 
 #if IS_ENABLED(CONFIG_TCPC_CLASS)
 #include "tcpm.h"
 #endif
+
+/* prize liuyong, add for fac test, 20231024, start */
+struct mtk_extcon_info *g_extcon;
+static struct delayed_work delay_work_t;
+/* prize liuyong, add for fac test, 20231024, end */
 
 static const unsigned int usb_extcon_cable[] = {
 	EXTCON_USB,
@@ -99,6 +107,26 @@ static int mtk_usb_extcon_set_role(struct mtk_extcon_info *extcon,
 
 	return 0;
 }
+
+/* prize liuyong, add for fac test, 20231024, start */
+int usb_set_role(int role)
+{
+	if (!g_extcon) {
+		pr_err("g_extcon is NULL,return..........\n");
+		return -1;
+	}
+
+	pr_err("mtk_usb_extcon_set_role:%d\n",role);
+	if (role) {
+		mtk_usb_extcon_set_role(g_extcon,USB_ROLE_DEVICE);
+	} else {
+		mtk_usb_extcon_set_role(g_extcon,USB_ROLE_NONE);
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL(usb_set_role);
+/* prize liuyong, add for fac test, 20231024, end */
 
 static bool usb_is_online(struct mtk_extcon_info *extcon)
 {
@@ -191,16 +219,42 @@ static int mtk_usb_extcon_psy_init(struct mtk_extcon_info *extcon)
 	if (ret)
 		dev_err(dev, "fail to register notifer\n");
 fail:
+	dev_err(dev, "extcon fail to register notifer\n");
 	return ret;
+}
+
+static struct charger_device *primary_charger;
+
+static int mtk_usb_extcon_set_vbus_v1(bool is_on) {
+	if (!primary_charger) {
+		primary_charger = get_charger_by_name("primary_chg");
+		if (!primary_charger) {
+			pr_info("%s: get primary charger device failed\n", __func__);
+			return -ENODEV;
+		}
+	}
+
+	if (is_on) {
+		charger_dev_enable_otg(primary_charger, true);
+		charger_dev_set_boost_current_limit(primary_charger,1500000);
+	} else {
+		charger_dev_enable_otg(primary_charger, false);
+	}
+	return 0;
 }
 
 static int mtk_usb_extcon_set_vbus(struct mtk_extcon_info *extcon,
 							bool is_on)
 {
-	struct regulator *vbus = extcon->vbus;
+/* pri modify by liuyong, config otg 20231016 start */
+	//struct regulator *vbus = extcon->vbus;
 	struct device *dev = extcon->dev;
-	int ret;
+	//int ret;
 
+	dev_info(dev, "vbus turn %s\n", is_on ? "on" : "off");
+#if 1
+	mtk_usb_extcon_set_vbus_v1(is_on);
+#else
 	/* vbus is optional */
 	if (!vbus || extcon->vbus_on == is_on)
 		return 0;
@@ -228,12 +282,14 @@ static int mtk_usb_extcon_set_vbus(struct mtk_extcon_info *extcon,
 
 		ret = regulator_enable(vbus);
 		if (ret) {
-			dev_info(dev, "vbus regulator enable failed\n");
+			dev_err(dev, "vbus regulator enable failed\n");
 			return ret;
 		}
 	} else {
 		regulator_disable(vbus);
 	}
+#endif
+/* pri modify by liuyong, config otg 20231016 end */
 
 	extcon->vbus_on = is_on;
 
@@ -275,6 +331,7 @@ static int mtk_usb_extcon_vbus_init(struct mtk_extcon_info *extcon)
 		dev_info(dev, "vbus-current=%d", extcon->vbus_cur);
 
 fail:
+	dev_err(dev, "mtk_usb_extcon_vbus_init failed\n");
 	return ret;
 }
 
@@ -604,6 +661,9 @@ static int mtk_usb_extcon_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, extcon);
 
+	/* prize liuyong, add for fac test, 20231024, start */
+	g_extcon = extcon;
+	/* prize liuyong, add for fac test, 20231024, end */
 	return 0;
 }
 
@@ -637,11 +697,43 @@ static struct platform_driver mtk_usb_extcon_driver = {
 	},
 };
 
+/* prize liuyong, add for fac test, 20231024, start */
+static void delay_work_work(struct work_struct *work)
+{
+	static count = 0;
+	if (!primary_charger) {
+		primary_charger = get_charger_by_name("primary_chg");
+		if (!primary_charger) {
+			pr_info("%s: get primary charger device failed\n", __func__);
+			if (count >= 10){
+				platform_driver_register(&mtk_usb_extcon_driver);
+			} else {
+				schedule_delayed_work(&delay_work_t, msecs_to_jiffies(500));
+				count++;
+			}
+		}
+	}
+
+	if (primary_charger != NULL) {
+		pr_info("%s: get primary charger device success, %d\n", __func__, count);
+		platform_driver_register(&mtk_usb_extcon_driver);
+	}
+}
+
 static int __init mtk_usb_extcon_init(void)
 {
-	return platform_driver_register(&mtk_usb_extcon_driver);
+	printk("mtk_usb_extcon_init\n");
+
+	INIT_DELAYED_WORK(&delay_work_t, delay_work_work);
+
+	schedule_delayed_work(&delay_work_t, msecs_to_jiffies(1000));
+
+	return 0;
+
+	//return platform_driver_register(&mtk_usb_extcon_driver);
 }
-late_initcall(mtk_usb_extcon_init);
+late_initcall_sync(mtk_usb_extcon_init);
+/* prize liuyong, add for fac test, 20231024, end */
 
 static void __exit mtk_usb_extcon_exit(void)
 {

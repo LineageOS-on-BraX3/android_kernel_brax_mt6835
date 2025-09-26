@@ -61,7 +61,15 @@ static void print_out_dwork_fn(struct work_struct *work)
 
 	if (dbg_log_limit && printed >= dbg_log_limit) {
 		mod_delayed_work(system_wq, dwork, begin + HZ - j + 1);
-		return;
+		//drv mod tankaikun, ALPS10177320, start
+		if (!mn) {
+			return;
+		} else {
+			pr_notice("printed > dbg_log_limit \n");
+			kfree(mn);
+			return;
+		}
+		//drv mod tankaikun, ALPS10177320, end
 	}
 
 	mutex_lock(&list_lock);
