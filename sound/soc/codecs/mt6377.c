@@ -18,11 +18,20 @@
 #include <sound/tlv.h>
 #include <sound/soc.h>
 #include <sound/core.h>
+#include "aw87xxx/aw87xxx.h"
 
 #include "mt6377.h"
 #if IS_ENABLED(CONFIG_SND_SOC_MT6377_ACCDET)
 #include "mt6377-accdet.h"
 #endif
+
+//add by zhaohong for HAC support,20231017  start
+extern int HAC_GPIO ;
+
+#if IS_ENABLED(CONFIG_MTK_HAC_SUPPORT)
+#include <linux/gpio.h>
+#endif
+//add by zhaohong for HAC support,20231017  end
 
 #define MAX_DEBUG_WRITE_INPUT 256
 #define CODEC_SYS_DEBUG_SIZE (1024 * 32)
@@ -34,6 +43,9 @@ static ssize_t mt6377_codec_sysfs_write(struct file *filp, struct kobject *kobj,
 					struct bin_attribute *bin_attr,
 					char *buf, loff_t off, size_t count);
 
+#if IS_ENABLED(CONFIG_SND_SOC_AW87XXX)
+	extern int aw87xxx_add_codec_controls(void *codec);
+#endif
 
 /* static function declaration */
 static void mt6377_set_gpio_smt(struct mt6377_priv *priv)
@@ -308,6 +320,14 @@ static const char *const hp_dl_pga_gain[] = {
 	"-2Db", "-3Db", "-4Db", "-5Db", "-6Db",
 	"-7Db", "-8Db", "-9Db", "-10Db", "-40Db"
 };
+
+//add by zhaohong for HAC support,20231017  start
+#if IS_ENABLED(CONFIG_MTK_HAC_SUPPORT)
+static const char *const hac_state[] = {
+	"Off", "On",
+};
+#endif
+//add by zhaohong for HAC support,20231017  end
 
 static void zcd_enable(struct mt6377_priv *priv, bool enable, int device)
 {
@@ -602,6 +622,50 @@ static int mt6377_put_volsw(struct snd_kcontrol *kcontrol,
 
 	return ret;
 }
+
+//add by zhaohong for HAC support,20231017  start
+#if IS_ENABLED(CONFIG_MTK_HAC_SUPPORT)
+static void Receiver_Speaker_Switch_Change(bool enable)
+{
+	printk("%s\n", __func__);
+	if (enable)
+	{		
+	printk("%s() set hac true\n", __func__);
+		gpio_set_value(HAC_GPIO, 1);	
+	}
+	else
+	{
+	printk("%s()set hac false\n", __func__);
+		gpio_set_value(HAC_GPIO, 0);
+	}
+
+}
+
+static int Receiver_Speaker_Switch_Get(struct snd_kcontrol *kcontrol,
+				       struct snd_ctl_elem_value *ucontrol)
+{
+	printk("%s()\n", __func__);
+
+	return 0;
+}
+static int Receiver_Speaker_Switch_Set(struct snd_kcontrol *kcontrol,
+				       struct snd_ctl_elem_value *ucontrol)
+{
+	printk("%s()\n", __func__);
+
+	if (ucontrol->value.integer.value[0] == true)
+	{
+		Receiver_Speaker_Switch_Change(true);
+	}
+	else
+	{
+		Receiver_Speaker_Switch_Change(false);
+	}
+	
+	return 0;
+}
+#endif
+//add by zhaohong for HAC support,20231017  end
 
 static const DECLARE_TLV_DB_SCALE(hp_playback_tlv, -1000, 100, 0);
 static const DECLARE_TLV_DB_SCALE(playback_tlv, -1000, 100, 0);
@@ -2804,7 +2868,7 @@ static int mt_ul_src_dmic_event(struct snd_soc_dapm_widget *w,
 				     0x80);
 
 		regmap_update_bits(priv->regmap, MT6377_AFE_UL_SRC_CON1,
-				   0xf4, 0x0);
+				   0xf7, 0x0);
 		break;
 	case SND_SOC_DAPM_POST_PMD:
 		regmap_write(priv->regmap,
@@ -2996,10 +3060,10 @@ static int mt_pga_l_event(struct snd_soc_dapm_widget *w,
 		return -EINVAL;
 	}
 
-	/* if vow is enabled, always set volume as 4(24dB) */
-	mic_gain_l = priv->vow_enable ? 4 :
+	/* if vow is enabled, always set volume as 3(18dB) */
+	mic_gain_l = priv->vow_enable ? 3 :
 		     priv->ana_gain[AUDIO_ANALOG_VOLUME_MICAMP1];
-	dev_info(priv->dev, "%s(), event = 0x%x, mic_type %d, mic_gain_l %d, mux_pga %d\n",
+	dev_dbg(priv->dev, "%s(), event = 0x%x, mic_type %d, mic_gain_l %d, mux_pga %d\n",
 		__func__, event, mic_type, mic_gain_l, mux_pga);
 
 	switch (event) {
@@ -5440,6 +5504,8 @@ static void *get_vow_coeff_by_name(struct mt6377_priv *priv,
 		return &(priv->reg_afe_vow_vad_cfg5);
 	else if (strcmp(name, "Audio_VOW_Periodic") == 0)
 		return &(priv->reg_afe_vow_periodic);
+	else if (strcmp(name, "Audio_VOW_Periodic_Param") == 0)
+		return (void *) &(priv->vow_periodic_param);
 	else
 		return NULL;
 }
@@ -5483,6 +5549,31 @@ static int audio_vow_cfg_set(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+static int audio_vow_periodic_parm_set(struct snd_kcontrol *kcontrol,
+				       const unsigned int __user *data,
+				       unsigned int size)
+{
+	int ret = 0;
+	struct snd_soc_component *cmpnt = snd_soc_kcontrol_component(kcontrol);
+	struct mt6377_priv *priv = snd_soc_component_get_drvdata(cmpnt);
+	struct mt6377_vow_periodic_on_off_data *vow_param_cfg;
+
+	dev_info(priv->dev, "%s(), size = %d\n", __func__, size);
+	if (size > sizeof(struct mt6377_vow_periodic_on_off_data))
+		return -EINVAL;
+	vow_param_cfg = (struct mt6377_vow_periodic_on_off_data *)
+			get_vow_coeff_by_name(priv, kcontrol->id.name);
+	if (copy_from_user(vow_param_cfg, data,
+			   sizeof(struct mt6377_vow_periodic_on_off_data))) {
+		dev_info(priv->dev, "%s(),Fail copy to user Ptr:%p,r_sz:%zu\n",
+			 __func__,
+			 data,
+			 sizeof(struct mt6377_vow_periodic_on_off_data));
+		ret = -EFAULT;
+	}
+	return ret;
+}
+
 static const struct snd_kcontrol_new mt6377_snd_vow_controls[] = {
 	SOC_SINGLE_EXT("Audio VOWCFG0 Data",
 		       SND_SOC_NOPM, 0, 0x80000, 0,
@@ -5505,6 +5596,9 @@ static const struct snd_kcontrol_new mt6377_snd_vow_controls[] = {
 	SOC_SINGLE_EXT("Audio_VOW_Periodic",
 		       SND_SOC_NOPM, 0, 0x80000, 0,
 		       audio_vow_cfg_get, audio_vow_cfg_set),
+	SND_SOC_BYTES_TLV("Audio_VOW_Periodic_Param",
+			  sizeof(struct mt6377_vow_periodic_on_off_data),
+			  NULL, audio_vow_periodic_parm_set),
 };
 
 /* misc control */
@@ -5538,6 +5632,11 @@ static int hp_plugged_in_set(struct snd_kcontrol *kcontrol,
 
 static const struct soc_enum misc_control_enum[] = {
 	SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(off_on_function), off_on_function),
+    //add by zhaohong for HAC support,20231017  start
+	#if IS_ENABLED(CONFIG_MTK_HAC_SUPPORT)
+	SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(hac_state), hac_state),
+	#endif
+	//add by zhaohong for HAC support,20231017  end
 };
 
 static int mt6377_rcv_acc_set(struct snd_kcontrol *kcontrol,
@@ -5737,6 +5836,13 @@ static const struct snd_kcontrol_new mt6377_snd_misc_controls[] = {
 	SOC_ENUM_EXT("PMIC_REG_CLEAR", misc_control_enum[0],
 		     NULL, mt6377_rcv_acc_set),
 	SOC_ENUM_EXT("DMic Used", misc_control_enum[0], dmic_used_get, NULL),
+		//add by zhaohong for HAC support,20231017  start
+	#if IS_ENABLED(CONFIG_MTK_HAC_SUPPORT)
+	SOC_ENUM_EXT("Receiver_Speaker_Switch", misc_control_enum[0],
+		     Receiver_Speaker_Switch_Get,
+		     Receiver_Speaker_Switch_Set),
+	#endif
+	//add by zhaohong for HAC support,20231017  end
 };
 
 static int mt6377_codec_init_reg(struct snd_soc_component *cmpnt)
@@ -5816,6 +5922,7 @@ static int mt6377_codec_probe(struct snd_soc_component *cmpnt)
 	struct snd_soc_card *sndcard = cmpnt->card;
 	struct snd_card *card = sndcard->snd_card;
 	int ret = 0;
+    int err = 0;
 
 	codec_dev_attr_reg.private = priv;
 	ret = snd_card_add_dev_attr(card, &codec_bin_attr_group);
@@ -5829,10 +5936,14 @@ static int mt6377_codec_probe(struct snd_soc_component *cmpnt)
 				       mt6377_snd_misc_controls,
 				       ARRAY_SIZE(mt6377_snd_misc_controls));
 
-	/* add vow controls */
-	snd_soc_add_component_controls(cmpnt,
-				       mt6377_snd_vow_controls,
-				       ARRAY_SIZE(mt6377_snd_vow_controls));
+#if IS_ENABLED(CONFIG_SND_SOC_AW87XXX)
+	err = aw87xxx_add_codec_controls((void *)cmpnt);
+	if (err < 0) {
+		pr_err("%s: add_codec_controls failed, err %d\n",  __func__, err);
+		return err;
+	};
+#endif
+
 	priv->hp_current_calibrate_val = get_hp_current_calibrate_val(priv);
 
 	return mt6377_codec_init_reg(cmpnt);

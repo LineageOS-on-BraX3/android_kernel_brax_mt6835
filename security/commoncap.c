@@ -68,6 +68,13 @@ int cap_capable(const struct cred *cred, struct user_namespace *targ_ns,
 {
 	struct user_namespace *ns = targ_ns;
 
+	/* begin, prize-lifenfen-20180227, add for kill permission check */
+#ifdef CONFIG_RESMON
+	if (cap == CAP_KILL && in_egroup_p(AID_READPROC))
+		return 0;
+#endif
+	/* end, prize-lifenfen-20180227, add for kill permission check */
+
 	/* See if cred has the capability in the target user namespace
 	 * by examining the target user namespace and all of the target
 	 * user namespace's parents.

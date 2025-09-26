@@ -3082,8 +3082,15 @@ static void mtk_battery_daemon_handler(struct mtk_battery *gm, void *nl_data,
 	case FG_DAEMON_CMD_IS_BAT_PLUGOUT:
 	{
 		int is_bat_plugout = 0;
+		/* prize liuyong, modify off charing bat plugout status, 20230110 start */
+		bool is_in_kpoc = is_kernel_power_off_charging();
+		/* prize liuyong, modify off charing bat plugout status, 20240110 end */
 
 		is_bat_plugout = gm->gauge->hw_status.is_bat_plugout;
+		/* prize liuyong, modify off charing bat plugout status, 20240110 start */
+		if (is_in_kpoc == true)
+			is_bat_plugout = 0;
+		/* prize liuyong, modify off charing bat plugout status, 20240110 end */
 		ret_msg->fgd_data_len += sizeof(is_bat_plugout);
 		memcpy(ret_msg->fgd_data,
 			&is_bat_plugout, sizeof(is_bat_plugout));

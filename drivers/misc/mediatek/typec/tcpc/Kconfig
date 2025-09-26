@@ -33,6 +33,18 @@ config TCPC_RT1711H
 	  TypeC port Controller
 	  Driver
 
+config TCPC_AW35616
+	tristate "Richtek AW35616 TypeC port Controller Driver"
+	depends on TCPC_CLASS
+	default n
+	help
+	  Say Y to enable
+	  Richtek AW35616
+	  TypeC port Controller
+	  Driver
+
+source "drivers/misc/mediatek/typec/tcpc/aw35615/Kconfig"
+
 config TCPC_MT6360
 	tristate "MediaTek MT6360 TypeC port Controller Driver"
 	depends on TCPC_CLASS
