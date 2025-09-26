@@ -1,0 +1,13 @@
+#
+# awinic driver configuration
+#
+
+config TCPC_AW35615_PD
+       tristate "Richtek AW35615_PD TypeC port Controller Driver"
+       depends on TCPC_CLASS
+       default n
+       help
+         Say Y to enable
+         Richtek AW35615_PD
+         TypeC port Controller
+         Driver

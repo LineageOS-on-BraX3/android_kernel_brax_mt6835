@@ -137,7 +137,9 @@ static void xhci_trace_ep0_urb(void *data, struct urb *urb)
 	int config_num, i;
 
 	if (!urb || !urb->setup_packet || !urb->dev) {
-		dev_dbg(hcd_dev, "%s urb/setup pkt/device can't be NULL\n", __func__);
+		//pri liuyong, modify for file restore, 20240812 start
+		//dev_dbg(hcd_dev, "%s urb/setup pkt/device can't be NULL\n", __func__);
+		//pri liuyong, modify for file restore, 20240812 end
 		return;
 	}
 

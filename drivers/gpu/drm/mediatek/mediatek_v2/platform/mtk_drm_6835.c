@@ -1649,7 +1649,9 @@ static int mtk_mipi_tx_pll_prepare_mt6835(struct clk_hw *hw)
 	} else {
 		return -EINVAL;
 	}
-
+	/* added by zhanghuimin for bug #SN339D-1513 20240102-begin */
+	writel(0x444428EA, mipi_tx->regs + MIPITX_VOLTAGE_SEL);
+	/* added by zhanghuimin for bug #SN339D-1513 20240102-end */
 	writel(0x0, mipi_tx->regs + MIPITX_PRESERVED);
 	writel(0x00FF12E0, mipi_tx->regs + MIPITX_PLL_CON4);
 	/* BG_LPF_EN / BG_CORE_EN */

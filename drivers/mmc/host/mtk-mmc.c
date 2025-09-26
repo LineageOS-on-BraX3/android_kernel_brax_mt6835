@@ -2926,6 +2926,17 @@ static void sdcard_oc_handler(struct work_struct *work)
 	msdc_sd_power_off(host);
 }
 
+/* Pri: add for meta mode sim slot detection, 20240725, begin */
+static ssize_t cd_gpio_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct mmc_host *mmc = dev_get_drvdata(dev);
+	int cd_gpio_state    = mmc_gpio_get_cd(mmc);
+
+	return sprintf(buf, "%d\n", cd_gpio_state);
+}
+static DEVICE_ATTR(cd_gpio, S_IRUGO, cd_gpio_show, NULL);
+/* Pri: add for meta mode sim slot detection, 20240725, end */
+
 static int msdc_drv_probe(struct platform_device *pdev)
 {
 	struct mmc_host *mmc;
@@ -3147,6 +3158,16 @@ static int msdc_drv_probe(struct platform_device *pdev)
 #if IS_ENABLED(CONFIG_RPMB)
 	ret = mmc_rpmb_register(mmc);
 #endif
+
+	/* Pri: add for meta mode sim slot detection, 20240725, begin */
+	// Create sysfs cd_gpio file only for sd
+	if (host->id == MSDC_SD) {
+		ret = device_create_file(&pdev->dev, &dev_attr_cd_gpio);
+		if (ret) {
+			dev_err(&pdev->dev, "Failed to create sysfs file for cd_gpio: %d\n", ret);
+		}
+	}
+	/* Pri: add for meta mode sim slot detection, 20240725, end */
 
 	return 0;
 end:
