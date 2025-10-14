@@ -8,7 +8,7 @@ ccflags-y += \
 		-DAW_HAVE_VDM \
 		-DAW_HAVE_DP
 
-obj-$(CONFIG_AW35615_PD) += aw35615_whole.o
+obj-$(CONFIG_TCPC_AW35615_PD) += aw35615_whole.o
 
 aw35615_whole-objs := \
 		aw35615_driver.o \
