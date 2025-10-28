@@ -14,16 +14,22 @@ PRE_DEFCONFIG_CMDS="KCONFIG_CONFIG=${ROOT_DIR}/${KERNEL_DIR}/arch/arm64/configs/
 POST_DEFCONFIG_CMDS="rm ${ROOT_DIR}/${KERNEL_DIR}/arch/arm64/configs/${DEFCONFIG}"
 INSTALL_MOD_STRIP=1
 
+EXTRA_CMDS="python ${ROOT_DIR}/system/libudft/utils/src/mkdtboimg.py cfg_create ${ROOT_DIR}/out/${BRANCH}/${KERNEL_DIR}/arch/arm64/boot/dtbo.img ${ROOT_DIR}/kernel-brax/dtboimg.cfg -d ${ROOT_DIR}/out/${BRANCH}/${KERNEL_DIR}/arch/arm64/boot/dts/mediatek"
+DIST_CMDS="python ${ROOT_DIR}/kernel-brax/append_certs.py --alignment 16 --cert1 ${ROOT_DIR}/kernel-brax/security/cert1.bin --cert2 ${ROOT_DIR}/kernel-brax/security/cert2.bin --dtbo ${ROOT_DIR}/out/${BRANCH}/dist/dtbo.img"
+
 DTC='${OUT_DIR}/scripts/dtc/dtc'
 
 MAKE_GOALS="${MAKE_GOALS}
 Image.lz4
 mediatek/mt6835.dtb
+mediatek/k6835v1_64.dtbo
 "
 
 FILES="${FILES}
 arch/arm64/boot/Image.lz4
+arch/arm64/boot/dtbo.img
 arch/arm64/boot/dts/mediatek/mt6835.dtb
+arch/arm64/boot/dts/mediatek/k6835v1_64.dtbo
 "
 
 ABI_OUT_TAG="mtk"
