@@ -32,26 +32,15 @@
 #include <linux/kthread.h>
 #include <linux/interrupt.h>
 #include <linux/regulator/consumer.h>
+#include <linux/init.h>
+#include <linux/notifier.h>
+#include <../../../../misc/mediatek/prize/cs_notifier/cs_notifier.h>
 #include "omnivision_tcm_core.h"
-#include <linux/platform_device.h>
 
-/*
-#include <linux/sched.h>
-#include <linux/fb.h>
-#include <linux/of.h>
-#include <linux/of_irq.h>
-#include <linux/of_address.h>
-#include <linux/of_device.h>
-#include <linux/of_gpio.h>
-#include "../tpd.h"
-*/
-
-//drv-modify by shenwenbin for TP charger mode 20240304 start
-#if OMNIVISION_TCM_CHARGER_MODE_EN
-#include <linux/power_supply.h>
-#include <linux/property.h>
+#if IS_ENABLED(CONFIG_PRIZE_HARDWARE_INFO)
+#include "../../../misc/mediatek/prize/hardware_info/hardware_info.h"
+extern struct hardware_info current_tp_info;
 #endif
-//drv-modify by shenwenbin for TP charger mode 20240304 end
 
 /* #define RESET_ON_RESUME */
 
@@ -97,58 +86,47 @@
 
 #define RMI_UBL_FN_NUMBER 0x35
 
-/*prize add by lvyuanchuan 20220214 start */
-
-#if IS_ENABLED(CONFIG_PRIZE_HARDWARE_INFO)
-#include "../../../misc/mediatek/prize/hardware_info/hardware_info.h"
-
-extern struct hardware_info current_tp_info;
-#endif
-
-/*prize add by lvyuanchuan 20220214 end */
+//#define USE_SYS_SUSPEND_METHOD
 
 struct ovt_tcm_hcd *g_tcm_hcd;
-#ifdef SPEED_UP_RESUME
+#if SPEED_UP_RESUME
 static void speedup_resume(struct work_struct *work);
 #endif
 
-//drv add by shenwenbin for headset detect 20240806 start
-#ifdef CONFIG_TOUCHSCREEN_OMNIVISION_TCM_EAR_PHONE
-bool ovt_tcm_probe_initialized = false;
-void ovt_tcm_switch_ear_mode(unsigned short value);
-#endif
-//drv add by shenwenbin for headset detect 20240806 end
-struct ovt_tcm_host_dynamic_setting {
-	bool host_setting_flag;    // if this  setting come from host
-	unsigned short setting_value;
-};
+#define ovt_tcm_set_func_en(c_name, id) \
+int ovt_tcm_set_func_##c_name##_en_state(unsigned short value) \
+{ \
+	int retval = 0; \
+	struct ovt_tcm_hcd *tcm_hcd = g_tcm_hcd; \
+\
+	if ((!tcm_hcd) || (tcm_hcd->ovt_tcm_driver_removing)) { \
+		printk("tcm shutdown, do not #c_name\n"); \
+		return 0; \
+	} \
+	if (IS_NOT_FW_MODE(tcm_hcd->id_info.mode) || tcm_hcd->in_suspend || atomic_read(&tcm_hcd->host_downloading)) { \
+\
+	} else { \
+		retval = tcm_hcd->set_dynamic_config(tcm_hcd, id, value); \
+		if (retval != 0) { \
+			LOGE(tcm_hcd->pdev->dev.parent,"Failed to set #c_name command\n"); \
+		} \
+	} \
+	tcm_hcd->func_##c_name##_en = value; \
+	return retval; \
+} \
+extern int g_tp_rest_gpio;
 
-static struct ovt_tcm_host_dynamic_setting g_ovt_host_dynamic_set_value[256];
+ovt_tcm_set_func_en(charger_connected, DC_CHARGER_CONNECTED)
+ovt_tcm_set_func_en(face_detect, DC_ENABLE_FACE)
+ovt_tcm_set_func_en(ear_phone_connected, DC_ENABLE_EAR_PHONE)
+ovt_tcm_set_func_en(roate_horizontal_level, DC_ENABLE_ROATE_HORIZONTAL_LEVEL)
 
-int ovt_tcm_set_dynamic_config_host_interface(unsigned char id, unsigned short value)
-{
-	int retval = 0;
-	struct ovt_tcm_hcd *tcm_hcd = g_tcm_hcd;
-	if ((!tcm_hcd) || (tcm_hcd->ovt_tcm_driver_removing)) {
-		printk("tcm shutdown, return\n");
-		return 0;
-	}
+EXPORT_SYMBOL(ovt_tcm_set_func_charger_connected_en_state);
+EXPORT_SYMBOL(ovt_tcm_set_func_face_detect_en_state);
+EXPORT_SYMBOL(ovt_tcm_set_func_ear_phone_connected_en_state);
+EXPORT_SYMBOL(ovt_tcm_set_func_roate_horizontal_level_en_state);
 
-	g_ovt_host_dynamic_set_value[id].host_setting_flag = true;
-	g_ovt_host_dynamic_set_value[id].setting_value = value;
 
-	if (IS_NOT_FW_MODE(tcm_hcd->id_info.mode) || tcm_hcd->in_suspend || atomic_read(&tcm_hcd->host_downloading)) {
-
-	} else {
-		retval = tcm_hcd->set_dynamic_config(tcm_hcd, id, value);
-		if (retval < 0) {
-			LOGE(tcm_hcd->pdev->dev.parent,"Failed to set dynamic %02x : %d command\n", id, value);
-		}
-	}
-	return retval;
-}
-
-EXPORT_SYMBOL(ovt_tcm_set_dynamic_config_host_interface);
 
 #define dynamic_config_sysfs(c_name, id) \
 static ssize_t ovt_tcm_sysfs_##c_name##_show(struct device *dev, \
@@ -247,7 +225,7 @@ static ssize_t ovt_tcm_sysfs_##c_name##_store(struct device *dev, \
 \
 	mutex_lock(&tcm_hcd->extif_mutex); \
 \
-	retval = ovt_tcm_set_dynamic_config_host_interface(id, input); \
+	retval = ovt_tcm_set_##c_name##_state(input); \
 	if (retval < 0) { \
 		LOGE(tcm_hcd->pdev->dev.parent, \
 				"Failed to set dynamic config  #c_name\n"); \
@@ -284,9 +262,9 @@ SHOW_STORE_PROTOTYPE(ovt_tcm, inhibit_frequency_shift)
 SHOW_STORE_PROTOTYPE(ovt_tcm, requested_frequency)
 SHOW_STORE_PROTOTYPE(ovt_tcm, disable_hsync)
 SHOW_STORE_PROTOTYPE(ovt_tcm, rezero_on_exit_deep_sleep)
-SHOW_STORE_PROTOTYPE(ovt_tcm, charger_connected)
-SHOW_STORE_PROTOTYPE(ovt_tcm, roate_horizontal_level)
-SHOW_STORE_PROTOTYPE(ovt_tcm, ear_phone_connected)
+SHOW_STORE_PROTOTYPE(ovt_tcm, func_charger_connected_en)
+SHOW_STORE_PROTOTYPE(ovt_tcm, func_roate_horizontal_level_en)
+SHOW_STORE_PROTOTYPE(ovt_tcm, func_ear_phone_connected_en)
 SHOW_STORE_PROTOTYPE(ovt_tcm, no_baseline_relaxation)
 SHOW_STORE_PROTOTYPE(ovt_tcm, in_wakeup_gesture_mode)
 SHOW_STORE_PROTOTYPE(ovt_tcm, stimulus_fingers)
@@ -313,9 +291,9 @@ static struct device_attribute *dynamic_config_attrs[] = {
 	ATTRIFY(requested_frequency),
 	ATTRIFY(disable_hsync),
 	ATTRIFY(rezero_on_exit_deep_sleep),
-	ATTRIFY(charger_connected),
-	ATTRIFY(roate_horizontal_level),
-	ATTRIFY(ear_phone_connected),
+	ATTRIFY(func_charger_connected_en),
+	ATTRIFY(func_roate_horizontal_level_en),
+	ATTRIFY(func_ear_phone_connected_en),
 	ATTRIFY(no_baseline_relaxation),
 	ATTRIFY(in_wakeup_gesture_mode),
 	ATTRIFY(stimulus_fingers),
@@ -323,6 +301,16 @@ static struct device_attribute *dynamic_config_attrs[] = {
 	ATTRIFY(enable_thick_glove),
 	ATTRIFY(enable_glove),
 };
+/* pri added for SL005TC-231 notifier 20250609 begin */
+#if IS_ENABLED(CONFIG_CS_NOTIFIER)
+#if IS_ENABLED(CONFIG_TOUCHSCREEN_OMNIVISION_TCM_CHARGER)
+static int ovt_tcm_usb_notifier_callback(struct notifier_block *nb, unsigned long event, void *data);
+#endif
+#if IS_ENABLED(CONFIG_TOUCHSCREEN_OMNIVISION_TCM_EAR_PHONE)
+static int ovt_tcm_earphone_notifier_callback(struct notifier_block *nb, unsigned long event, void *data);
+#endif
+#endif
+/* pri added for SL005TC-231 notifier 20250609 end */
 
 static int ovt_tcm_get_app_info(struct ovt_tcm_hcd *tcm_hcd);
 static int ovt_tcm_sensor_detection(struct ovt_tcm_hcd *tcm_hcd);
@@ -815,11 +803,11 @@ dynamic_config_sysfs(disable_hsync, DC_DISABLE_HSYNC)
 
 dynamic_config_sysfs(rezero_on_exit_deep_sleep, DC_REZERO_ON_EXIT_DEEP_SLEEP)
 
-dynamic_config_advance_sysfs(charger_connected, DC_CHARGER_CONNECTED)
+dynamic_config_advance_sysfs(func_charger_connected_en, DC_CHARGER_CONNECTED)
 
-dynamic_config_advance_sysfs(roate_horizontal_level, DC_ENABLE_ROATE_HORIZONTAL_LEVEL)
+dynamic_config_advance_sysfs(func_roate_horizontal_level_en, DC_ENABLE_ROATE_HORIZONTAL_LEVEL)
 
-dynamic_config_advance_sysfs(ear_phone_connected, DC_ENABLE_EAR_PHONE)
+dynamic_config_advance_sysfs(func_ear_phone_connected_en, DC_ENABLE_EAR_PHONE)
 
 dynamic_config_sysfs(no_baseline_relaxation, DC_NO_BASELINE_RELAXATION)
 
@@ -1645,15 +1633,13 @@ retry:
 
 	tcm_hcd->payload_length = le2_to_uint(header->length);
 
-/*
-	LOGN(tcm_hcd->pdev->dev.parent,
-			"Status report code = 0x%02x\n",
-			tcm_hcd->status_report_code);
+	//LOGN(tcm_hcd->pdev->dev.parent,
+	//		"Status report code = 0x%02x\n",
+	//		tcm_hcd->status_report_code);
 
-	LOGN(tcm_hcd->pdev->dev.parent,
-			"Payload length = %d\n",
-			tcm_hcd->payload_length);
-*/
+	//LOGN(tcm_hcd->pdev->dev.parent,
+	//		"Payload length = %d\n",
+	//		tcm_hcd->payload_length);
 
 	if (tcm_hcd->status_report_code <= STATUS_ERROR ||
 			tcm_hcd->status_report_code == STATUS_INVALID) {
@@ -1663,6 +1649,11 @@ retry:
 		case STATUS_CONTINUED_READ:
 			LOGD(tcm_hcd->pdev->dev.parent,
 					"Out-of-sync continued read\n");
+			tcm_hcd->payload_length = 0;
+			UNLOCK_BUFFER(tcm_hcd->in);
+			mutex_unlock(&tcm_hcd->rw_ctrl_mutex); // move unlock rw mutex to here
+			retval = 0;
+			goto exit;
 		case STATUS_IDLE:
 		case STATUS_BUSY:
 			tcm_hcd->payload_length = 0;
@@ -1754,7 +1745,7 @@ exit:
 		}
 	}
 
-	
+
 
 	return retval;
 }
@@ -1918,9 +1909,9 @@ static int ovt_tcm_write_message(struct ovt_tcm_hcd *tcm_hcd,
 
 	chunks = chunks == 0 ? 1 : chunks;
 
-	LOGN(tcm_hcd->pdev->dev.parent,
-			"Command = 0x%02x\n",
-			command);
+	//LOGN(tcm_hcd->pdev->dev.parent,
+	//		"Command = 0x%02x\n",
+	//		command);
 
 	LOCK_BUFFER(tcm_hcd->out);
 
@@ -2270,7 +2261,7 @@ static int ovt_tcm_enable_irq(struct ovt_tcm_hcd *tcm_hcd, bool en, bool ns)
 
 		if (irq_freed) {
 			retval = request_threaded_irq(tcm_hcd->irq, NULL,
-					ovt_tcm_isr, IRQF_ONESHOT | IRQF_TRIGGER_LOW,
+					ovt_tcm_isr, 0x2008,
 					PLATFORM_DRIVER_NAME, tcm_hcd);
 			if (retval < 0) {
 				LOGE(tcm_hcd->pdev->dev.parent,
@@ -2304,8 +2295,7 @@ queue_polling_work:
 			goto exit;
 		}
 
-		if (bdata->irq_gpio >= 0)
-		{
+		if (bdata->irq_gpio >= 0) {
 			if (ns) {
 				disable_irq_nosync(tcm_hcd->irq);
 			} else {
@@ -2315,7 +2305,6 @@ queue_polling_work:
 			irq_freed = !ns;
 		}
 
-#ifdef FALL_BACK_ON_POLLING
 		if (ns) {
 			cancel_delayed_work(&tcm_hcd->polling_work);
 		} else {
@@ -2324,7 +2313,6 @@ queue_polling_work:
 		}
 
 		tcm_hcd->do_polling = false;
-#endif
 	}
 
 	retval = 0;
@@ -2410,6 +2398,8 @@ static int ovt_tcm_config_gpio(struct ovt_tcm_hcd *tcm_hcd)
 					"Failed to configure reset GPIO\n");
 			goto err_set_gpio_reset;
 		}
+
+		g_tp_rest_gpio = bdata->reset_gpio;
 	}
 
 	if (bdata->power_gpio >= 0) {
@@ -2795,14 +2785,13 @@ get_info:
 	}
 
 	retval = 0;
-/*prize add by lvyuanchuan 20220214 start */
 #if IS_ENABLED(CONFIG_PRIZE_HARDWARE_INFO)
 	sprintf(current_tp_info.id,"FW:0x%02x", tcm_hcd->packrat_number);
-	strcpy(current_tp_info.chip, "td4160");
-	strcpy(current_tp_info.vendor, "txd");
-	sprintf(current_tp_info.more, "%d*%d", 720, 1612); 
+	strcpy(current_tp_info.chip, "td4160c");
+	strcpy(current_tp_info.vendor, "omnivision");
+	sprintf(current_tp_info.more, "%d*%d", 720, 1612);
 #endif
-/*prize add by lvyuanchuan 20220214 end */
+
 exit:
 	mutex_unlock(&tcm_hcd->identify_mutex);
 
@@ -3131,13 +3120,30 @@ static void ovt_tcm_reinit_func_when_hdl_done(void)
 {
 	int retval = 0;
 	struct ovt_tcm_hcd *tcm_hcd = g_tcm_hcd;
-	int i = 0;
-	for (i = 0; i < 256; i++) {
-		if (g_ovt_host_dynamic_set_value[i].host_setting_flag) {
-			retval = ovt_tcm_set_dynamic_config(tcm_hcd, i, g_ovt_host_dynamic_set_value[i].setting_value);
-			if (retval < 0) {
-				LOGE(tcm_hcd->pdev->dev.parent,"Failed to set dynamic command id 0x%x  to %d\n", i, g_ovt_host_dynamic_set_value[i].setting_value);
-			}
+	//hdl done here, do some init
+	if (tcm_hcd->func_charger_connected_en) {
+		//default is not connected state, no need to set false
+		retval = ovt_tcm_set_dynamic_config(tcm_hcd, DC_CHARGER_CONNECTED, tcm_hcd->func_charger_connected_en);
+		if (retval != 0) {
+			LOGE(tcm_hcd->pdev->dev.parent,"Failed to set DC_CHARGER_CONNECTED command\n");
+		}
+	}
+	if (tcm_hcd->func_face_detect_en) {
+		retval = ovt_tcm_set_dynamic_config(tcm_hcd, DC_ENABLE_FACE, tcm_hcd->func_face_detect_en);
+		if (retval != 0) {
+			LOGE(tcm_hcd->pdev->dev.parent,"Failed to set DC_ENABLE_FACE command\n");
+		}
+	}
+	if (tcm_hcd->func_ear_phone_connected_en) {
+		retval = ovt_tcm_set_dynamic_config(tcm_hcd, DC_ENABLE_EAR_PHONE, tcm_hcd->func_ear_phone_connected_en);
+		if (retval != 0) {
+			LOGE(tcm_hcd->pdev->dev.parent,"Failed to set DC_ENABLE_EAR_PHONE command\n");
+		}
+	}
+	if (tcm_hcd->func_roate_horizontal_level_en) {
+		retval = ovt_tcm_set_dynamic_config(tcm_hcd, DC_ENABLE_ROATE_HORIZONTAL_LEVEL, tcm_hcd->func_roate_horizontal_level_en);
+		if (retval != 0) {
+			LOGE(tcm_hcd->pdev->dev.parent,"Failed to set DC_ENABLE_ROATE_HORIZONTAL_LEVEL command\n");
 		}
 	}
 }
@@ -3269,7 +3275,7 @@ static int ovt_tcm_reset(struct ovt_tcm_hcd *tcm_hcd)
 	return retval;
 }
 
-
+/*
 //if lcd request the gpio firstly, maybe lcd driver should provide a function to control tp reset
 void ovt_tcm_set_reset_gpio(int value)
 {
@@ -3278,13 +3284,12 @@ void ovt_tcm_set_reset_gpio(int value)
 	if (tcm_hcd) {
 		const struct ovt_tcm_board_data *bdata = tcm_hcd->hw_if->bdata;
 		if (bdata->reset_gpio >= 0) {
-			LOGE(tcm_hcd->pdev->dev.parent,"ovt_tcm_set_reset_gpio %d\n", value);
 			//already gpio_request and gpio_direction_output, just set value here
 			gpio_set_value(bdata->reset_gpio, value ? 1 : 0);
 		}
 	}
 }
-
+*/
 
 static int ovt_tcm_reset_and_reinit(struct ovt_tcm_hcd *tcm_hcd,
 		bool hw, bool update_wd)
@@ -3543,7 +3548,7 @@ static void ovt_tcm_helper_work(struct work_struct *work)
 		if (retval < 0) {
 			LOGE(tcm_hcd->pdev->dev.parent,
 					"Failed to initialze touch reporting\n");
-			mutex_unlock(&tcm_hcd->reset_mutex);		
+			mutex_unlock(&tcm_hcd->reset_mutex);
 			break;
 		}
 		ovt_tcm_reinit_func_when_hdl_done();
@@ -3583,70 +3588,26 @@ static void ovt_tcm_helper_work(struct work_struct *work)
 	return;
 }
 
-static int ovt_tcm_do_suspend(struct ovt_tcm_hcd *tcm_hcd)
+#if defined(CONFIG_PM) || defined(CONFIG_DRM) || defined(CONFIG_FB)
+static int ovt_tcm_resume(struct device *dev)
 {
-	struct ovt_tcm_module_handler *mod_handler;
-	int retval = 0;
-
-	if (tcm_hcd->in_suspend  || tcm_hcd->ovt_tcm_driver_removing)
-		return 0;
-
-		LOGE(tcm_hcd->pdev->dev.parent,
-				"ovt_tcm_do_suspend\n");
-
+#if SPEED_UP_RESUME
+	struct ovt_tcm_hcd *tcm_hcd = dev_get_drvdata(dev);
 	mutex_lock(&tcm_hcd->suspend_resume_mutex);
-
-#ifdef WATCHDOG_SW
-	tcm_hcd->update_watchdog(tcm_hcd, false);
-#endif
-	if (atomic_read(&tcm_hcd->host_downloading)) {
-		retval = ovt_tcm_wait_hdl(tcm_hcd);
-		if (retval < 0) {
-			LOGE(tcm_hcd->pdev->dev.parent, "Failed to wait for completion of host download\n");
-		}
-	}
-	//todo wait for hostdownload done here
-	touch_suspend(tcm_hcd);
-
-	mutex_lock(&mod_pool.mutex);
-
-	if (!list_empty(&mod_pool.list)) {
-		list_for_each_entry(mod_handler, &mod_pool.list, link) {
-			if (!mod_handler->insert &&
-					!mod_handler->detach &&
-					(mod_handler->mod_cb->suspend))
-				mod_handler->mod_cb->suspend(tcm_hcd);
-		}
-	}
-
-	mutex_unlock(&mod_pool.mutex);
-
-	if (!tcm_hcd->wakeup_gesture_enabled) {
-		tcm_hcd->enable_irq(tcm_hcd, false, true);
-		if (atomic_read(&tcm_hcd->command_status) != CMD_IDLE) {
-			atomic_set(&tcm_hcd->command_status, CMD_ERROR);
-			complete(&response_complete);
-		}
-	}
-
-	tcm_hcd->in_suspend = true;
+	queue_work(tcm_hcd->speed_up_resume_workqueue, &tcm_hcd->speed_up_work);
 	mutex_unlock(&tcm_hcd->suspend_resume_mutex);
 	return 0;
-}
-
-static int ovt_tcm_do_resume(struct ovt_tcm_hcd *tcm_hcd)
-{
+#else
 	int retval;
 	struct ovt_tcm_module_handler *mod_handler;
+	struct ovt_tcm_hcd *tcm_hcd = dev_get_drvdata(dev);
 
 	if (!tcm_hcd->in_suspend  || tcm_hcd->ovt_tcm_driver_removing)
 		return 0;
-
-		LOGE(tcm_hcd->pdev->dev.parent,
-				"ovt_tcm_do_resume\n");
-
+#ifdef CONFIG_OVT_CHARGER_DETECT
+	ovt_start_charger_detect(tcm_hcd);
+#endif
 	mutex_lock(&tcm_hcd->suspend_resume_mutex);
-
 	if (tcm_hcd->in_hdl_mode) {
 		tcm_hcd->enable_irq(tcm_hcd, true, NULL);
 		retval = ovt_tcm_wait_hdl(tcm_hcd);
@@ -3710,45 +3671,128 @@ do_reset:
 mod_resume:
 	touch_resume(tcm_hcd);
 
-#if OMNIVISION_TCM_CHARGER_MODE_EN
-	if (tcm_hcd->charger_mode) {
-		pr_err("ovt_tcm_resume charger mode enable need swith");
-		retval = tcm_hcd->set_dynamic_config(tcm_hcd,
-				 DC_CHARGER_CONNECTED,
-				 tcm_hcd->charger_mode);
-		if (retval < 0) {
-			LOGE(tcm_hcd->pdev->dev.parent,
-					"Failed to switch charger mode\n");
-		}
-	}
+#ifdef WATCHDOG_SW
+	tcm_hcd->update_watchdog(tcm_hcd, true);
 #endif
 
-#ifdef CONFIG_TOUCHSCREEN_OMNIVISION_TCM_EAR_PHONE
-	if (tcm_hcd->earphone_mode) {
-		pr_err("ovt_tcm_resume earphone mode enable need swith");
-		retval = tcm_hcd->set_dynamic_config(tcm_hcd,
-				 DC_ENABLE_EAR_PHONE,
-				 tcm_hcd->earphone_mode);
-		if (retval < 0) {
-			LOGE(tcm_hcd->pdev->dev.parent,
-					"Failed to switch earphone mode\n");
+	mutex_lock(&mod_pool.mutex);
+
+	if (!list_empty(&mod_pool.list)) {
+		list_for_each_entry(mod_handler, &mod_pool.list, link) {
+			if (!mod_handler->insert &&
+					!mod_handler->detach &&
+					(mod_handler->mod_cb->resume))
+				mod_handler->mod_cb->resume(tcm_hcd);
 		}
 	}
-#endif
-//drv modify by kuangliangjun for double tap wakeup function 20241010 start
-#if OMNIVISION_TCM_GLOVE_MODE_EN
-	if (tcm_hcd->glove_mode_enable) {
-		pr_err("ovt_tcm_resume glove mode enable need swith");
-		retval = tcm_hcd->set_dynamic_config(tcm_hcd,
-				 DC_ENABLE_GLOVE,
-				 tcm_hcd->glove_mode_enable);
-		if (retval < 0) {
-			LOGE(tcm_hcd->pdev->dev.parent,
-					"Failed to switch glove mode\n");
-		}
+
+	mutex_unlock(&mod_pool.mutex);
+
+	retval = 0;
+
+exit:
+	/* pri added for SL005TC-231 notifier 20250609 begin */
+#if IS_ENABLED(CONFIG_CS_NOTIFIER)
+#if IS_ENABLED(CONFIG_TOUCHSCREEN_OMNIVISION_TCM_CHARGER)
+	if (tcm_hcd->usb_state) {
+		LOGN(tcm_hcd->pdev->dev.parent,"Charging plug in!\n");
+		ovt_tcm_set_func_charger_connected_en_state(1);
 	}
 #endif
-//drv modify by kuangliangjun for double tap wakeup function 20241010 end
+#if IS_ENABLED(CONFIG_TOUCHSCREEN_OMNIVISION_TCM_EAR_PHONE)
+	if (tcm_hcd->earphone_state) {
+		LOGN(tcm_hcd->pdev->dev.parent,"Earphone plug in!\n");
+		ovt_tcm_set_func_ear_phone_connected_en_state(1);
+	}
+#endif
+#endif
+	/* pri added for SL005TC-231 notifier 20250609 end */
+
+	tcm_hcd->in_suspend = false;
+	mutex_unlock(&tcm_hcd->suspend_resume_mutex);
+	return retval;
+#endif
+}
+#if SPEED_UP_RESUME
+static void speedup_resume(struct work_struct *work)
+{
+	struct ovt_tcm_hcd *tcm_hcd = container_of(work, struct ovt_tcm_hcd, speed_up_work);
+
+	int retval;
+	struct ovt_tcm_module_handler *mod_handler;
+
+
+	LOGE(tcm_hcd->pdev->dev.parent,"speed up resume enter\n");
+	if (!tcm_hcd->in_suspend  || tcm_hcd->ovt_tcm_driver_removing)
+		return;
+#ifdef CONFIG_OVT_CHARGER_DETECT
+	ovt_start_charger_detect(tcm_hcd);
+#endif
+	mutex_lock(&tcm_hcd->suspend_resume_mutex);
+	pm_stay_awake(&tcm_hcd->pdev->dev);
+	if (tcm_hcd->in_hdl_mode) {
+		tcm_hcd->enable_irq(tcm_hcd, true, NULL);
+		retval = ovt_tcm_wait_hdl(tcm_hcd);
+		if (retval < 0) {
+			LOGE(tcm_hcd->pdev->dev.parent,
+					"Failed to wait for completion of host download\n");
+			goto exit;
+		}
+		goto mod_resume;
+	} else {
+		if (!tcm_hcd->wakeup_gesture_enabled)
+			tcm_hcd->enable_irq(tcm_hcd, true, NULL);
+
+#ifdef RESET_ON_RESUME
+		msleep(RESET_ON_RESUME_DELAY_MS);
+		goto do_reset;
+#endif
+	}
+
+	if (IS_NOT_FW_MODE(tcm_hcd->id_info.mode) ||
+			tcm_hcd->app_status != APP_STATUS_OK) {
+		LOGN(tcm_hcd->pdev->dev.parent,
+				"Identifying mode = 0x%02x\n",
+				tcm_hcd->id_info.mode);
+		goto do_reset;
+	}
+
+	retval = tcm_hcd->sleep(tcm_hcd, false);
+	if (retval < 0) {
+		LOGE(tcm_hcd->pdev->dev.parent,
+				"Failed to exit deep sleep\n");
+		goto exit;
+	}
+
+	retval = ovt_tcm_rezero(tcm_hcd);
+	if (retval < 0) {
+		LOGE(tcm_hcd->pdev->dev.parent,
+				"Failed to rezero\n");
+		goto exit;
+	}
+
+	goto mod_resume;
+
+do_reset:
+	retval = tcm_hcd->reset_n_reinit(tcm_hcd, false, true);
+	if (retval < 0) {
+		LOGE(tcm_hcd->pdev->dev.parent,
+				"Failed to do reset and reinit\n");
+		goto exit;
+	}
+
+	if (IS_NOT_FW_MODE(tcm_hcd->id_info.mode) ||
+			tcm_hcd->app_status != APP_STATUS_OK) {
+		LOGN(tcm_hcd->pdev->dev.parent,
+				"Identifying mode = 0x%02x\n",
+				tcm_hcd->id_info.mode);
+		retval = 0;
+		goto exit;
+	}
+
+mod_resume:
+	touch_resume(tcm_hcd);
+
 #ifdef WATCHDOG_SW
 	tcm_hcd->update_watchdog(tcm_hcd, true);
 #endif
@@ -3770,55 +3814,161 @@ mod_resume:
 
 exit:
 	tcm_hcd->in_suspend = false;
+	pm_relax(&tcm_hcd->pdev->dev);
 	mutex_unlock(&tcm_hcd->suspend_resume_mutex);
-	return retval;
-}
-
-static int ovt_tcm_early_suspend(struct device *dev)
-{
-	int retval;
-	struct ovt_tcm_hcd *tcm_hcd = dev_get_drvdata(dev);
-	retval = ovt_tcm_do_suspend(tcm_hcd);
-	return 0;
-}
-
-static int ovt_tcm_suspend(struct device *dev)
-{
-	int retval;
-	struct ovt_tcm_hcd *tcm_hcd = dev_get_drvdata(dev);
-	retval = ovt_tcm_do_suspend(tcm_hcd);
-	return 0;
-}
-static int ovt_tcm_resume(struct device *dev)
-{
-	struct ovt_tcm_hcd *tcm_hcd = dev_get_drvdata(dev);
-#ifdef SPEED_UP_RESUME
-	queue_work(tcm_hcd->speed_up_resume_workqueue, &tcm_hcd->speed_up_work);
-#else
-	ovt_tcm_do_resume(tcm_hcd);
-#endif
-	return 0;
-}
-#ifdef SPEED_UP_RESUME
-static void speedup_resume(struct work_struct *work)
-{
-	struct ovt_tcm_hcd *tcm_hcd = container_of(work, struct ovt_tcm_hcd, speed_up_work);
-	ovt_tcm_do_resume(tcm_hcd);
 	LOGE(tcm_hcd->pdev->dev.parent,"speed up resume end\n");
 	return;
 }
 #endif
+static int ovt_tcm_suspend(struct device *dev)
+{
+	struct ovt_tcm_module_handler *mod_handler;
+	struct ovt_tcm_hcd *tcm_hcd = dev_get_drvdata(dev);
 
-//#define MTK_DISP_EARLY_EVENT_BLANK	0x00
-//#define MTK_DISP_EVENT_BLANK		0x01
-//enum {
-//	/* disp power on */
-//	MTK_DISP_BLANK_UNBLANK,
-//	/* disp power off */
-//	MTK_DISP_BLANK_POWERDOWN,
-//};
+	LOGI(tcm_hcd->pdev->dev.parent,"ovt_tcm_suspend enter\n");
 
-#if IS_ENABLED(CONFIG_DRM_MEDIATEK)
+	if (tcm_hcd->in_suspend || tcm_hcd->ovt_tcm_driver_removing)
+		return 0;
+#ifdef CONFIG_OVT_CHARGER_DETECT
+	ovt_stop_charger_detect(tcm_hcd);
+#endif
+	mutex_lock(&tcm_hcd->suspend_resume_mutex);
+	touch_suspend(tcm_hcd);
+
+	mutex_lock(&mod_pool.mutex);
+
+	if (!list_empty(&mod_pool.list)) {
+		list_for_each_entry(mod_handler, &mod_pool.list, link) {
+			if (!mod_handler->insert &&
+					!mod_handler->detach &&
+					(mod_handler->mod_cb->suspend))
+				mod_handler->mod_cb->suspend(tcm_hcd);
+		}
+	}
+
+	mutex_unlock(&mod_pool.mutex);
+
+	if (!tcm_hcd->wakeup_gesture_enabled) {
+		tcm_hcd->enable_irq(tcm_hcd, false, true);
+		if (atomic_read(&tcm_hcd->command_status) != CMD_IDLE) {
+			atomic_set(&tcm_hcd->command_status, CMD_ERROR);
+			complete(&response_complete);
+		}
+	}
+
+
+	tcm_hcd->in_suspend = true;
+	mutex_unlock(&tcm_hcd->suspend_resume_mutex);
+	LOGI(tcm_hcd->pdev->dev.parent,"ovt_tcm_suspend exit\n");
+	return 0;
+}
+#endif
+#ifdef CONFIG_DRM
+static int ovt_tcm_early_suspend(struct device *dev)
+{
+	int retval;
+	struct ovt_tcm_module_handler *mod_handler;
+	struct ovt_tcm_hcd *tcm_hcd = dev_get_drvdata(dev);
+
+	if (tcm_hcd->in_suspend  || tcm_hcd->ovt_tcm_driver_removing)
+		return 0;
+	mutex_lock(&tcm_hcd->suspend_resume_mutex);
+#ifdef WATCHDOG_SW
+	tcm_hcd->update_watchdog(tcm_hcd, false);
+#endif
+
+	if (IS_NOT_FW_MODE(tcm_hcd->id_info.mode) ||
+			tcm_hcd->app_status != APP_STATUS_OK) {
+		LOGN(tcm_hcd->pdev->dev.parent,
+				"Identifying mode = 0x%02x\n",
+				tcm_hcd->id_info.mode);
+		if (tcm_hcd->in_hdl_mode) {
+			retval = ovt_tcm_wait_hdl(tcm_hcd);
+			if (retval < 0) {
+				LOGE(tcm_hcd->pdev->dev.parent, "Failed to wait for completion of host download\n");
+			}
+		}
+
+		mutex_unlock(&tcm_hcd->suspend_resume_mutex);
+		return 0;
+	}
+
+	touch_early_suspend(tcm_hcd);
+
+	mutex_lock(&mod_pool.mutex);
+
+	if (!list_empty(&mod_pool.list)) {
+		list_for_each_entry(mod_handler, &mod_pool.list, link) {
+			if (!mod_handler->insert &&
+					!mod_handler->detach &&
+					(mod_handler->mod_cb->early_suspend))
+				mod_handler->mod_cb->early_suspend(tcm_hcd);
+		}
+	}
+
+	mutex_unlock(&mod_pool.mutex);
+
+	if (!tcm_hcd->wakeup_gesture_enabled) {
+		tcm_hcd->enable_irq(tcm_hcd, false, true);
+		if (atomic_read(&tcm_hcd->command_status) != CMD_IDLE) {
+			atomic_set(&tcm_hcd->command_status, CMD_ERROR);
+			complete(&response_complete);
+		}
+	}
+
+	mutex_unlock(&tcm_hcd->suspend_resume_mutex);
+	return 0;
+}
+/* pri added for SL005TC-231 notifier 20250609 begin */
+#if IS_ENABLED(CONFIG_CS_NOTIFIER)
+#if IS_ENABLED(CONFIG_TOUCHSCREEN_OMNIVISION_TCM_CHARGER)
+static int ovt_tcm_usb_notifier_callback(struct notifier_block *nb, unsigned long event, void *data)
+{
+	struct ovt_tcm_hcd *tcm_hcd =
+				container_of(nb, struct ovt_tcm_hcd, usb_notifier);
+
+	LOGD(tcm_hcd->pdev->dev.parent, "notifier,event:%lu\n", event);
+	if (event == USB_PLUG_IN) {
+		tcm_hcd->usb_state = 1;
+		ovt_tcm_set_func_charger_connected_en_state(1);
+		LOGD(tcm_hcd->pdev->dev.parent, "Charging plug!\n");
+	} else if (event == USB_PLUG_OUT) {
+		tcm_hcd->usb_state = 0;
+		ovt_tcm_set_func_charger_connected_en_state(0);
+		LOGD(tcm_hcd->pdev->dev.parent, "Charge pull out!\n");
+	} else {
+		LOGD(tcm_hcd->pdev->dev.parent, "Unknown charging status!\n");
+		return -EINVAL;
+	}
+	return 0;
+}
+#endif
+#if IS_ENABLED(CONFIG_TOUCHSCREEN_OMNIVISION_TCM_EAR_PHONE)
+static int ovt_tcm_earphone_notifier_callback(struct notifier_block *nb, unsigned long event, void *data)
+{
+	struct ovt_tcm_hcd *tcm_hcd =
+				container_of(nb, struct ovt_tcm_hcd, earphone_notifier);
+
+	LOGD(tcm_hcd->pdev->dev.parent, "notifier,event:%lu\n", event);
+	if (event == EARPHONE_PLUG_IN) {
+		tcm_hcd->earphone_state = 1;
+		ovt_tcm_set_func_ear_phone_connected_en_state(1);
+		LOGD(tcm_hcd->pdev->dev.parent, "Earphone plug in!\n");
+	} else if (event == EARPHONE_PLUG_OUT) {
+		tcm_hcd->earphone_state = 0;
+		ovt_tcm_set_func_ear_phone_connected_en_state(0);
+		LOGD(tcm_hcd->pdev->dev.parent, "Earphone pull out!\n");
+	} else {
+		LOGD(tcm_hcd->pdev->dev.parent, "Unknown Earphone status!\n");
+		return -EINVAL;
+	}
+	return 0;
+}
+#endif
+#endif
+/* pri added for SL005TC-231 notifier 20250609 end */
+
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_V2)
 static int ovt_tcm_fb_notifier_cb(struct notifier_block *nb,
 		unsigned long action, void *data)
 {
@@ -3828,8 +3978,8 @@ static int ovt_tcm_fb_notifier_cb(struct notifier_block *nb,
 			container_of(nb, struct ovt_tcm_hcd, fb_notifier);
 	retval = 0;
 
-	LOGE(tcm_hcd->pdev->dev.parent,
-				"ovt_tcm_disp_notifier_cb evdata = %d action = %d\n", *evdata ,action);
+	LOGD(tcm_hcd->pdev->dev.parent,
+				"ovt_tcm_disp_notifier_cb evdata = %d action = %lu\n", *evdata ,action);
 
 	if (data && tcm_hcd) {
 
@@ -3850,14 +4000,7 @@ static int ovt_tcm_fb_notifier_cb(struct notifier_block *nb,
 				retval = 0;
 			}
 		}
-/*
-		if (action == MTK_DISP_EARLY_EVENT_BLANK && *evdata == MTK_DISP_BLANK_UNBLANK) {
-			ovt_tcm_set_reset_gpio(0);
-			msleep(5);
-			ovt_tcm_set_reset_gpio(1);
-			msleep(5);
-		}
-*/
+
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 		if(0)
 #else
@@ -3865,23 +4008,23 @@ static int ovt_tcm_fb_notifier_cb(struct notifier_block *nb,
 				*evdata == MTK_DISP_BLANK_POWERDOWN)
 #endif
 			retval = ovt_tcm_early_suspend(&tcm_hcd->pdev->dev);
-		else if (action == MTK_DISP_EVENT_BLANK) {
+		else if (action == MTK_DISP_EARLY_EVENT_BLANK) {
 			if (*evdata == MTK_DISP_BLANK_POWERDOWN) {
 				retval = ovt_tcm_suspend(&tcm_hcd->pdev->dev);
 				tcm_hcd->fb_ready = 0;
 			} else if (*evdata == MTK_DISP_BLANK_UNBLANK) {
 #ifndef RESUME_EARLY_UNBLANK
-	LOGE(tcm_hcd->pdev->dev.parent,"ovt_tcm_resume\n");
+	LOGD(tcm_hcd->pdev->dev.parent,"ovt_tcm_resume\n");
 				retval = ovt_tcm_resume(&tcm_hcd->pdev->dev);
 				tcm_hcd->fb_ready++;
 #endif
 			}
-		} else 
+		} else
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 		if (0)
 #else
 		if (action == MTK_DISP_EARLY_EVENT_BLANK &&
-				*evdata == MTK_DISP_BLANK_UNBLANK) 
+				*evdata == MTK_DISP_BLANK_UNBLANK)
 #endif
 		{
 #ifdef RESUME_EARLY_UNBLANK
@@ -3893,6 +4036,7 @@ static int ovt_tcm_fb_notifier_cb(struct notifier_block *nb,
 
 	return 0;
 }
+#endif
 #elif IS_ENABLED(CONFIG_FB)
 static int ovt_tcm_fb_notifier_cb(struct notifier_block *nb,
 		unsigned long action, void *data)
@@ -3941,12 +4085,12 @@ static int ovt_tcm_fb_notifier_cb(struct notifier_block *nb,
 				tcm_hcd->fb_ready++;
 #endif
 			}
-		} else 
+		} else
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 		if (0)
 #else
 		if (action == FB_EARLY_EVENT_BLANK &&
-				*transition == FB_BLANK_UNBLANK) 
+				*transition == FB_BLANK_UNBLANK)
 #endif
 		{
 #ifdef RESUME_EARLY_UNBLANK
@@ -3989,10 +4133,10 @@ f35_boot_recheck:
 							"Failed to find F$35, try_times = %d\n",
 							retry);
 				if (retry < retry_max) {
-					msleep(100);                   
+					msleep(100);
                     gpio_set_value(bdata->reset_gpio, 0);
                     msleep(5);
-                    gpio_set_value(bdata->reset_gpio, 1);        
+                    gpio_set_value(bdata->reset_gpio, 1);
                     msleep(5);
 					retry++;
 			goto f35_boot_recheck;
@@ -4106,240 +4250,23 @@ static int ovt_tcm_sensor_detection(struct ovt_tcm_hcd *tcm_hcd)
 	return 0;
 }
 
-//drv modify by kuangliangjun for double tap wakeup function 20241010 start 
-extern int g_tp_gesture_flag;
-extern void prize_common_node_register(char* name,void(*set)(unsigned char on_off));
-static void ovt_tcm_double_type_func(unsigned char on)
+//extern int g_tp_gesture_flag;
+//extern void prize_common_node_register(char* name,void(*set)(unsigned char on_off));
+/*
+static void ovt_tcm_double_gesture_func(unsigned char on)
 {
-    struct ovt_tcm_hcd *tcm_hcd;
-
-	tcm_hcd = g_tcm_hcd;
-
-    if (tcm_hcd->in_suspend) {
-        LOGE(tcm_hcd->pdev->dev.parent,
-				"In suspend,not operation gesture mode!");
-        return;
-    }
-	
-    mutex_lock(&tcm_hcd->extif_mutex);
-    if (1 == on) {
-        LOGE(tcm_hcd->pdev->dev.parent,"enable gesture");
-        tcm_hcd->wakeup_gesture_enabled = 1;
+	if (1 == on) {
+		printk("[%s] open double gesture\n", __func__);
+		g_tcm_hcd->wakeup_gesture_enabled = true;
 		g_tp_gesture_flag = 1;
-    } else if (0 == on) {
-        LOGE(tcm_hcd->pdev->dev.parent,"disable gesture");
-        tcm_hcd->wakeup_gesture_enabled = 0;
+	} else if (0 == on) {
+		printk("[%s] close double gesture\n", __func__);
+		g_tcm_hcd->wakeup_gesture_enabled = false;
 		g_tp_gesture_flag = 0;
-    }
-    mutex_unlock(&tcm_hcd->extif_mutex);
-}
-
-//drv modify by kuangliangjun for double tap wakeup function 20241010 end
-
-
-//drv-modify by shenwenbin for TP charger mode 20240304 start
-#if OMNIVISION_TCM_CHARGER_MODE_EN || OMNIVISION_TCM_GLOVE_MODE_EN || defined(CONFIG_TOUCHSCREEN_OMNIVISION_TCM_EAR_PHONE)
-/* add_for_charger_mode */
-static int ovt_tcm_switch_func_mode(unsigned char id, unsigned short value) 
-{ 
-	int retval;  
-	struct ovt_tcm_hcd *tcm_hcd; 
-
-	tcm_hcd = g_tcm_hcd; 
-
-	mutex_lock(&tcm_hcd->extif_mutex); 
-
-	retval = ovt_tcm_set_dynamic_config_host_interface(id, value); 
-	if (retval < 0) { 
-		LOGE(tcm_hcd->pdev->dev.parent, 
-				"Failed to set dynamic config  #c_name\n"); 
-		goto exit; 
-	} 
-
-exit: 
-	mutex_unlock(&tcm_hcd->extif_mutex); 
-
-	return retval; 
-}
-#endif
-
-#if OMNIVISION_TCM_CHARGER_MODE_EN
-static void ovt_tcm_charger_switch_work(struct work_struct *work)
-{
-	int ret = 0;
-	struct ovt_tcm_hcd *tcm_hcd = g_tcm_hcd;
-
-	pr_info("ovt_tcm tcm_hcd->charger_mode = %d",tcm_hcd->charger_mode);
-
-	ret = ovt_tcm_switch_func_mode(DC_CHARGER_CONNECTED, tcm_hcd->charger_mode);
-	if (ret >= 0) {
-		pr_err("ovt_tcm switch charger mode successfully");
 	}
-
-	return;
 }
+*/
 
-static int ovt_tcm_charger_notifier_callback(struct notifier_block *nb, unsigned long val, void *v)
-{
-	int ret = 0;
-	struct power_supply *psy = NULL;
-	union power_supply_propval prop;
-	struct ovt_tcm_hcd *tcm_hcd = g_tcm_hcd;
-	bool isPsyBattery = false;
-
-	if (tcm_hcd->psy_name && !strcmp(tcm_hcd->psy_name, "battery")) {
-		psy = power_supply_get_by_name("battery");
-		isPsyBattery = true;
-	}
-	else
-		psy = power_supply_get_by_name("usb");
-
-	if (!psy) {
-		LOGE(tcm_hcd->pdev->dev.parent,"Couldn't get psy\n");
-		return -EINVAL;
-	}
-	if (!strcmp(psy->desc->name, "usb") || !strcmp(psy->desc->name, "battery")) {
-		if (psy && val == POWER_SUPPLY_PROP_STATUS) {
-			if (isPsyBattery) {
-				ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_STATUS, &prop);
-			}
-			else {
-				ret = power_supply_get_property(psy, POWER_SUPPLY_PROP_PRESENT, &prop);
-			}
-			if (ret < 0) {
-				LOGE(tcm_hcd->pdev->dev.parent,"Couldn't get POWER_SUPPLY_PROP_STATUS rc=%d\n", ret);
-				return ret;
-			} else {
-				if (tcm_hcd->charger_status != prop.intval) {
-					pr_err("ovt_tcm usb prop.intval = %d;tcm_hcd->charger_status = %d;tcm_hcd->charger_mode = %d", prop.intval,tcm_hcd->charger_status,tcm_hcd->charger_mode);
-					tcm_hcd->charger_status = prop.intval;
-
-					switch (tcm_hcd->charger_status){
-						case POWER_SUPPLY_STATUS_CHARGING:
-					    case POWER_SUPPLY_STATUS_NOT_CHARGING:
-						case POWER_SUPPLY_STATUS_FULL:
-							tcm_hcd->charger_mode = 1;
-							break;
-						default:
-							tcm_hcd->charger_mode = 0;
-							break;
-					};
-
-					pr_debug("ovt_tcm tcm_hcd->charger_status = %d;tcm_hcd->charger_mode = %d",tcm_hcd->charger_status,tcm_hcd->charger_mode);	
-					if (!tcm_hcd->in_suspend && (!atomic_read(&tcm_hcd->host_downloading))) {
-			            pr_debug("ovt_tcm enter charger mode swith");
-						queue_delayed_work(tcm_hcd->switch_charger_mode_workqueue,
-								&tcm_hcd->switch_charger_mode_work,
-								msecs_to_jiffies(500));
-        			}
-				}
-			}
-		}
-	}
-	return 0;
-}
-
-static int ovt_tcm_charger_notifier_callback_init(struct ovt_tcm_hcd *tcm_hcd)
-{
-	int ret = 0;
-
-	tcm_hcd->notifier_charger.notifier_call = ovt_tcm_charger_notifier_callback;
-	ret = power_supply_reg_notifier(&tcm_hcd->notifier_charger);
-	if (ret < 0) {
-		LOGE(tcm_hcd->pdev->dev.parent,"power_supply_reg_notifier failed\n");
-	}
-    return ret;
-}
-
-static int ovt_tcm_charger_notifier_callback_exit(struct ovt_tcm_hcd *tcm_hcd)
-{
-    power_supply_unreg_notifier(&tcm_hcd->notifier_charger);
-    LOGE(tcm_hcd->pdev->dev.parent,"Unregistering ts_data->notifier_charger.\n");
-    return 0;
-}
-#endif
-//drv-modify by shenwenbin for TP charger mode 20240304 end
-
-//drv add by shenwenbin for headset detect 20240806 start
-#ifdef CONFIG_TOUCHSCREEN_OMNIVISION_TCM_EAR_PHONE
-void ovt_tcm_switch_ear_mode(unsigned short value)
-{
-	int ret = 0;
-
-	if(ovt_tcm_probe_initialized != true){
-		pr_info("ovt_tcm-%s.ovt_tcm_probe_initialized not successfully",__func__);
-		return;
-	}
-
-	struct ovt_tcm_hcd *tcm_hcd = g_tcm_hcd;
-
-	pr_info("ovt_tcm tcm_hcd->earphone_mode before :%d ;Now : %d",tcm_hcd->earphone_mode,value);
-	tcm_hcd->earphone_mode = value;
-	
-	if (!tcm_hcd->in_suspend && (!atomic_read(&tcm_hcd->host_downloading))) {
-	    switch (value) {
-	    case 1:
-	        pr_info("ovt_tcm: Headset Plugged In");
-	        ret = ovt_tcm_switch_func_mode(DC_ENABLE_EAR_PHONE, tcm_hcd->earphone_mode);
-			if (ret >= 0) {
-				pr_info("ovt_tcm switch enter earphone mode successfully");
-			}
-	        break;
-	    case 0:
-	        pr_info("ovt_tcm: Headset Plugged Out");
-	        ret = ovt_tcm_switch_func_mode(DC_ENABLE_EAR_PHONE, tcm_hcd->earphone_mode);
-			if (ret >= 0) {
-				pr_info("ovt_tcm switch out earphone mode successfully");
-			}
-	        break;
-	    default:
-	        break;
-	    }
-	}
-    return;
-}
-EXPORT_SYMBOL(ovt_tcm_switch_ear_mode);
-#endif
-//drv add by shenwenbin for headset detect 20240806 end
-
-//drv modify by kuangliangjun for glove mode function 20241010 start
-#if OMNIVISION_TCM_GLOVE_MODE_EN
-static ssize_t ovt_glove_mode_show(
-    struct device *dev, struct device_attribute *attr, char *buf)
-{
-    int count = 0;
-	struct ovt_tcm_hcd *tcm_hcd = g_tcm_hcd;
-
-    count = snprintf(buf, PAGE_SIZE, "Glove Mode:%s\n", tcm_hcd->glove_mode_enable ? "On" : "Off");
-
-    return count;
-}
-
-static ssize_t ovt_glove_mode_store(
-    struct device *dev,
-    struct device_attribute *attr, const char *buf, size_t count)
-{
-    //int ret = 0;
-	//struct himax_ts_data *ts = private_ts;
-
-	struct ovt_tcm_hcd *tcm_hcd = g_tcm_hcd;
-    if (buf[0] == '1') {
-		tcm_hcd->glove_mode_enable = 1;
-		ovt_tcm_switch_func_mode(DC_ENABLE_GLOVE, 1);
-        pr_info("enable glove mode");
-    } else if (buf[0] == '0') {
-		tcm_hcd->glove_mode_enable = 0;
-		ovt_tcm_switch_func_mode(DC_ENABLE_GLOVE, 0);
-        pr_info("disable glove mode");
-    }
-
-    return count;
-}
-
-static DEVICE_ATTR(state, S_IRUGO | S_IWUSR,
-                   ovt_glove_mode_show, ovt_glove_mode_store);
-#endif  
-//drv modify by kuangliangjun for glove mode function 20241010 end
 
 static int ovt_tcm_probe(struct platform_device *pdev)
 {
@@ -4348,16 +4275,7 @@ static int ovt_tcm_probe(struct platform_device *pdev)
 	struct ovt_tcm_hcd *tcm_hcd;
 	const struct ovt_tcm_board_data *bdata;
 	const struct ovt_tcm_hw_interface *hw_if;
-//drv modify by kuangliangjun for glove mode function 20241010 start
-#if OMNIVISION_TCM_GLOVE_MODE_EN
-	static struct kobject *sysfs_rootdir = NULL;
-	struct kobject *drv_glove = NULL;
-	int err = 0;
-#endif
-//drv modify by kuangliangjun for glove mode function 20241010 end
-
 	LOGE(&pdev->dev,"ovt_tcm_probe\n");
-
 	hw_if = pdev->dev.platform_data;
 	if (!hw_if) {
 		LOGE(&pdev->dev,
@@ -4400,7 +4318,8 @@ static int ovt_tcm_probe(struct platform_device *pdev)
 	tcm_hcd->rd_chunk_size = RD_CHUNK_SIZE;
 	tcm_hcd->wr_chunk_size = WR_CHUNK_SIZE;
 	tcm_hcd->is_detected = false;
-	tcm_hcd->wakeup_gesture_enabled = WAKEUP_GESTURE;
+	tcm_hcd->wakeup_gesture_enabled = 0;
+	//prize_common_node_register("GESTURE", &ovt_tcm_double_gesture_func);
 
 #ifdef PREDICTIVE_READING
 	tcm_hcd->read_length = MIN_READ_LENGTH;
@@ -4468,6 +4387,7 @@ static int ovt_tcm_probe(struct platform_device *pdev)
 		INIT_LIST_HEAD(&mod_pool.list);
 		mod_pool.initialized = true;
 	}
+
 	retval = ovt_tcm_get_regulator(tcm_hcd, true);
 	if (retval < 0) {
 		LOGE(tcm_hcd->pdev->dev.parent,
@@ -4488,6 +4408,7 @@ static int ovt_tcm_probe(struct platform_device *pdev)
 				"Failed to configure GPIO's\n");
 		goto err_config_gpio;
 	}
+
 	/* detect the type of touch controller */
 	retval = ovt_tcm_sensor_detection(tcm_hcd);
 	if (retval < 0) {
@@ -4513,6 +4434,8 @@ static int ovt_tcm_probe(struct platform_device *pdev)
 		retval = -EINVAL;
 		goto err_sysfs_create_dir;
 	}
+	LOGE(tcm_hcd->pdev->dev.parent,
+			"222 PLATFORM_DRIVER_NAME:%s\n", PLATFORM_DRIVER_NAME);
 
 	tcm_hcd->sysfs_dir = sysfs_dir;
 
@@ -4526,16 +4449,16 @@ static int ovt_tcm_probe(struct platform_device *pdev)
 			goto err_sysfs_create_file;
 		}
 	}
+	LOGE(tcm_hcd->pdev->dev.parent,"333 creat_sysfs\n");
 
-#ifdef ZHANRUI_PLATFORM
+#ifdef USE_SYS_SUSPEND_METHOD
 /*create /sys/touchscreen */
 	retval = sysfs_create_link(NULL, &tcm_hcd->pdev->dev.kobj,"touchscreen");
 	if (retval < 0) {
 		LOGE(tcm_hcd->pdev->dev.parent,
-			"Failed to create /sys/touchscreen link\n");		
+			"Failed to create /sys/touchscreen link\n");
 	}
 #endif
-
 	tcm_hcd->dynamnic_config_sysfs_dir =
 			kobject_create_and_add(DYNAMIC_CONFIG_SYSFS_DIR_NAME,
 			tcm_hcd->sysfs_dir);
@@ -4557,34 +4480,28 @@ static int ovt_tcm_probe(struct platform_device *pdev)
 		}
 	}
 
-//drv modify by kuangliangjun for glove mode function 20241010 start
-#if OMNIVISION_TCM_GLOVE_MODE_EN
-	if (!sysfs_rootdir) {
-		// this kobject is shared between modules, do not free it when error occur
-		sysfs_rootdir = kobject_create_and_add("prize", kernel_kobj);
-	}
-
-	if (!drv_glove)
-		drv_glove = kobject_create_and_add("smartcover", sysfs_rootdir);
-
-	err = sysfs_create_link(drv_glove, &tcm_hcd->pdev->dev.kobj, "common_node");
-
-	if (err) {
-		pr_info("prize himax sysfs_create_link fail\n");
-		return -ENOMEM;
-	}
-	if (sysfs_create_file(&tcm_hcd->pdev->dev.kobj, &dev_attr_state.attr)) {
-		return -ENOMEM;
+/* pri added for SL005TC-231 notifier 20250609 begin */
+#if IS_ENABLED(CONFIG_CS_NOTIFIER)
+#if IS_ENABLED(CONFIG_TOUCHSCREEN_OMNIVISION_TCM_CHARGER)
+	tcm_hcd->usb_notifier.notifier_call = ovt_tcm_usb_notifier_callback;
+	retval = cs_usb_notifier_register(&tcm_hcd->usb_notifier);
+	if (retval < 0) {
+		LOGE(tcm_hcd->pdev->dev.parent,
+				"Failed to register usb notifier client\n");
 	}
 #endif
-//drv modify by kuangliangjun for glove mode function 20241010 end
+#if IS_ENABLED(CONFIG_TOUCHSCREEN_OMNIVISION_TCM_EAR_PHONE)
+	tcm_hcd->earphone_notifier.notifier_call = ovt_tcm_earphone_notifier_callback;
+	retval = cs_earphone_notifier_register(&tcm_hcd->earphone_notifier);
+	if (retval < 0) {
+		LOGE(tcm_hcd->pdev->dev.parent,
+				"Failed to register earphone notifier client\n");
+	}
+#endif
+#endif
+/* pri added for SL005TC-231 notifier 20250609 end */
 
-//drv modify by kuangliangjun for double tap wakeup function 20241010 start
-
-	prize_common_node_register("GESTURE", &ovt_tcm_double_type_func);
-
-//drv modify by kuangliangjun for double tap wakeup function 20241010 end
-#if IS_ENABLED(CONFIG_DRM_MEDIATEK)
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_V2)
 	tcm_hcd->fb_notifier.notifier_call = ovt_tcm_fb_notifier_cb;
 	retval = mtk_disp_notifier_register("tcm_ts_notifier",&tcm_hcd->fb_notifier);
 	if (retval < 0) {
@@ -4599,24 +4516,7 @@ static int ovt_tcm_probe(struct platform_device *pdev)
 				"Failed to register FB notifier client\n");
 	}
 #endif
-
-//drv-modify by shenwenbin for TP charger mode 20240304 start
-#if OMNIVISION_TCM_CHARGER_MODE_EN
-	tcm_hcd->psy_name = "battery";
-	pr_info("ovt_tcm_charger_mode_notifier_callback event psy->desc->name is %s",tcm_hcd->psy_name);
-	tcm_hcd->charger_status = 2;
-	tcm_hcd->charger_mode = 0;
-
-	tcm_hcd->switch_charger_mode_workqueue =
-			create_singlethread_workqueue("ovt_tcm_switch_charger");
-	INIT_DELAYED_WORK(&tcm_hcd->switch_charger_mode_work, ovt_tcm_charger_switch_work);
-
-    retval = ovt_tcm_charger_notifier_callback_init(tcm_hcd);
-    if (retval<0) {
-       LOGE(tcm_hcd->pdev->dev.parent,"init notifier callback fail");
-    }
-#endif
-//drv-modify by shenwenbin for TP charger mode 20240304 end
+LOGE(tcm_hcd->pdev->dev.parent,"444 CONFIG_DRM_MEDIATEK_V2:%d, tcm_ts_notifier\n", IS_ENABLED(CONFIG_DRM_MEDIATEK_V2));
 
 #ifdef REPORT_NOTIFIER
 	tcm_hcd->notifier_thread = kthread_run(ovt_tcm_report_notifier,
@@ -4628,11 +4528,19 @@ static int ovt_tcm_probe(struct platform_device *pdev)
 		goto err_create_run_kthread;
 	}
 #endif
+LOGE(tcm_hcd->pdev->dev.parent,"555 REPORT_NOTIFIER\n");
+
+#ifdef CONFIG_OVT_CHARGER_DETECT
+	tcm_hcd->workqueue =
+			create_singlethread_workqueue("ovt_tcm_charger_detect_workqueue");
+	LOGE(tcm_hcd->pdev->dev.parent,
+			"create charger detect workqueue\n");
+#endif
 
 	tcm_hcd->helper.workqueue =
 			create_singlethread_workqueue("ovt_tcm_helper");
 	INIT_WORK(&tcm_hcd->helper.work, ovt_tcm_helper_work);
-#ifdef SPEED_UP_RESUME
+#if SPEED_UP_RESUME
 	tcm_hcd->speed_up_resume_workqueue = create_singlethread_workqueue("speedup_resume_wq");
 	INIT_WORK(&tcm_hcd->speed_up_work, speedup_resume);
 #endif
@@ -4661,7 +4569,7 @@ static int ovt_tcm_probe(struct platform_device *pdev)
 			"Failed to enable interrupt\n");
 		goto err_enable_irq;
 	}
-	LOGD(tcm_hcd->pdev->dev.parent,
+	LOGE(tcm_hcd->pdev->dev.parent,
 			"Interrupt is registered\n");
 
 	/* ensure the app firmware is running */
@@ -4688,10 +4596,6 @@ prepare_modules:
 	mod_pool.queue_work = true;
 	queue_work(mod_pool.workqueue, &mod_pool.work);
 	mutex_unlock(&tcm_hcd->suspend_resume_mutex);
-
-#ifdef CONFIG_TOUCHSCREEN_OMNIVISION_TCM_EAR_PHONE
-	ovt_tcm_probe_initialized = true;
-#endif
 	return 0;
 
 err_enable_irq:
@@ -4715,23 +4619,13 @@ err_enable_irq:
 err_create_run_kthread:
 #endif
 
-//drv-modify by shenwenbin for TP charger mode 20240304 start
-#if OMNIVISION_TCM_CHARGER_MODE_EN
-	ovt_tcm_charger_notifier_callback_exit(tcm_hcd);
-	cancel_delayed_work_sync(&tcm_hcd->switch_charger_mode_work);
-	flush_workqueue(tcm_hcd->switch_charger_mode_workqueue);
-	destroy_workqueue(tcm_hcd->switch_charger_mode_workqueue);
-#endif
-//drv-modify by shenwenbin for TP charger mode 20240304 end
-
-#if IS_ENABLED(CONFIG_DRM_MEDIATEK)
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_V2)
     if (mtk_disp_notifier_unregister(&tcm_hcd->fb_notifier))
 		LOGE(tcm_hcd->pdev->dev.parent,"Error occurred while unregistering disp_notifier\n");
 #elif IS_ENABLED(CONFIG_FB)
     if (fb_unregister_client(&tcm_hcd->fb_notifier))
 		LOGE(tcm_hcd->pdev->dev.parent,"Error occurred while unregistering fb notifier\n");
 #endif
-
 
 err_sysfs_create_dynamic_config_file:
 	for (idx--; idx >= 0; idx--) {
@@ -4819,15 +4713,6 @@ static int ovt_tcm_remove(struct platform_device *pdev)
 
 	mutex_unlock(&mod_pool.mutex);
 
-//drv-modify by shenwenbin for TP charger mode 20240304 start
-#if OMNIVISION_TCM_CHARGER_MODE_EN
-	ovt_tcm_charger_notifier_callback_exit(tcm_hcd);
-	cancel_delayed_work_sync(&tcm_hcd->switch_charger_mode_work);
-	flush_workqueue(tcm_hcd->switch_charger_mode_workqueue);
-	destroy_workqueue(tcm_hcd->switch_charger_mode_workqueue);
-#endif
-//drv-modify by shenwenbin for TP charger mode 20240304 end
-
 	touch_remove(tcm_hcd);
 
 	if (tcm_hcd->irq_enabled && bdata->irq_gpio >= 0) {
@@ -4839,6 +4724,11 @@ static int ovt_tcm_remove(struct platform_device *pdev)
 	flush_workqueue(tcm_hcd->polling_workqueue);
 	destroy_workqueue(tcm_hcd->polling_workqueue);
 
+#ifdef CONFIG_OVT_CHARGER_DETECT
+	flush_workqueue(tcm_hcd->workqueue);
+	destroy_workqueue(tcm_hcd->workqueue);
+#endif
+
 #ifdef WATCHDOG_SW
 	cancel_delayed_work_sync(&tcm_hcd->watchdog.work);
 	flush_workqueue(tcm_hcd->watchdog.workqueue);
@@ -4848,8 +4738,18 @@ static int ovt_tcm_remove(struct platform_device *pdev)
 #ifdef REPORT_NOTIFIER
 	kthread_stop(tcm_hcd->notifier_thread);
 #endif
+/* pri added for SL005TC-231 notifier 20250609 begin */
+#if IS_ENABLED(CONFIG_CS_NOTIFIER)
+#if IS_ENABLED(CONFIG_TOUCHSCREEN_OMNIVISION_TCM_CHARGER)
+	cs_usb_notifier_unregister(&tcm_hcd->usb_notifier);
+#endif
+#if IS_ENABLED(CONFIG_TOUCHSCREEN_OMNIVISION_TCM_EAR_PHONE)
+	cs_earphone_notifier_unregister(&tcm_hcd->earphone_notifier);
+#endif
+#endif
+/* pri added for SL005TC-231 notifier 20250609 end */
 
-#if IS_ENABLED(CONFIG_DRM_MEDIATEK)
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_V2)
     if (mtk_disp_notifier_unregister(&tcm_hcd->fb_notifier))
 		LOGE(tcm_hcd->pdev->dev.parent,"Error occurred while unregistering disp_notifier\n");
 #elif IS_ENABLED(CONFIG_FB)
@@ -4899,18 +4799,18 @@ static int ovt_tcm_remove(struct platform_device *pdev)
 
 static void ovt_tcm_shutdown(struct platform_device *pdev)
 {
-	int retval;
+	//int retval;
 
-	retval = ovt_tcm_remove(pdev);
+	ovt_tcm_remove(pdev);
 }
 
 #ifdef CONFIG_PM
-static const struct dev_pm_ops ovt_tcm_dev_pm_ops = {
-#if !defined(CONFIG_DRM) && !defined(CONFIG_FB)
-	.suspend = ovt_tcm_suspend,
-	.resume = ovt_tcm_resume,
-#endif
-};
+//static const struct dev_pm_ops ovt_tcm_dev_pm_ops = {
+//#if !defined(CONFIG_DRM) && !defined(CONFIG_FB)
+//	.suspend = ovt_tcm_suspend,
+//	.resume = ovt_tcm_resume,
+//#endif
+//};
 #endif
 
 static struct platform_driver ovt_tcm_driver = {
@@ -4918,7 +4818,7 @@ static struct platform_driver ovt_tcm_driver = {
 		.name = PLATFORM_DRIVER_NAME,
 		.owner = THIS_MODULE,
 #ifdef CONFIG_PM
-		.pm = &ovt_tcm_dev_pm_ops,
+//		.pm = &ovt_tcm_dev_pm_ops,
 #endif
 	},
 	.probe = ovt_tcm_probe,
@@ -4926,9 +4826,40 @@ static struct platform_driver ovt_tcm_driver = {
 	.shutdown = ovt_tcm_shutdown,
 };
 
+struct tag_bootmode {
+    u32 size;
+    u32 tag;
+    u32 bootmode;
+    u32 boottype;
+};
+
+int get_lk_boot_mode(void)
+{
+    struct device_node *np_chosen;
+    struct tag_bootmode *tag = NULL;
+
+    np_chosen = of_find_node_by_path("/chosen");
+    if (!np_chosen)
+        np_chosen = of_find_node_by_path("/chosen@0");
+
+    tag = (struct tag_bootmode *)of_get_property(np_chosen, "atag,boot", NULL);
+    if (!tag) {
+        printk("%s: fail to get atag,boot\n", __func__);
+        return -1;
+    } else {
+        printk("%s---bootmode: 0x%x\n",__func__,tag->bootmode);
+        return tag->bootmode;
+    }
+
+    return 0;
+}
+
 static int __init ovt_tcm_module_init(void)
 {
 	int retval;
+
+	if (get_lk_boot_mode() == 8 || get_lk_boot_mode() == 9)
+		return 0;
 
 	retval = ovt_tcm_bus_init();
 	if (retval < 0)

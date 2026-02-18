@@ -44,7 +44,7 @@
 1: enable, need to keep lcd power, tp and lcd reset pin should  keep high, isr enable
 0 disable, tp isr should be disable before power off lcd
 */
-#define WAKEUP_GESTURE (1)//drv modify by kuangliangjun for double tap wakeup function 20241010
+//#define WAKEUP_GESTURE (0)//drv modify by kuangliangjun for double tap wakeup function 20241010
 
 //#define SPEED_UP_RESUME
 //#define CONFIG_OVT_CHARGER_DETECT

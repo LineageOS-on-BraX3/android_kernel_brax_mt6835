@@ -53,6 +53,9 @@
 #include <linux/of_gpio.h>
 #include <linux/gpio.h>
 
+int g_tp_rest_gpio = 0;
+EXPORT_SYMBOL_GPL(g_tp_rest_gpio);
+
 /* ************ Panel Master ********** */
 #include "mtk_fbconfig_kdebug.h"
 /* ********* end Panel Master *********** */
@@ -10670,6 +10673,10 @@ int mtk_dsi_get_vendor_id(void)
 		lcmVendorId = 2;
 	}
 	else if (!strcmp(g_lcm_vendor_name,"panel-huashi-ili9883-vdo"))
+	{
+		lcmVendorId = 1;
+	}
+	else if (!strcmp(g_lcm_vendor_name,"panel-truly-td4160c-vdo-90hz")) 
 	{
 		lcmVendorId = 1;
 	}

@@ -233,7 +233,16 @@ static int device_capture_touch_report_config(unsigned int count)
 
 	return 0;
 }
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 static long device_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+#else
+#ifdef HAVE_UNLOCKED_IOCTL
+static long device_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
+#else
+static int device_ioctl(struct inode *inp, struct file *filp, unsigned int cmd,
+		unsigned long arg)
+#endif
+#endif
 {
 	int retval;
 	struct ovt_tcm_hcd *tcm_hcd = device_hcd->tcm_hcd;
@@ -481,16 +490,16 @@ static int device_release(struct inode *inp, struct file *filp)
 	return 0;
 }
 
-static char *device_devnode(struct device *dev, umode_t *mode)
-{
-	if (!mode)
-		return NULL;
-
-	*mode = (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
-
-	return kasprintf(GFP_KERNEL, "%s/%s", PLATFORM_DRIVER_NAME,
-			dev_name(dev));
-}
+//static char *device_devnode(struct device *dev, umode_t *mode)
+//{
+//	if (!mode)
+//		return NULL;
+//
+//	*mode = (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
+//
+//	return kasprintf(GFP_KERNEL, "%s/%s", PLATFORM_DRIVER_NAME,
+//			dev_name(dev));
+//}
 
 static int device_create_class(void)
 {
@@ -499,7 +508,7 @@ static int device_create_class(void)
 	if (device_hcd->class != NULL)
 		return 0;
 
-	device_hcd->class = class_create(THIS_MODULE, PLATFORM_DRIVER_NAME);
+	device_hcd->class = __class_create(THIS_MODULE, PLATFORM_DRIVER_NAME, NULL);
 
 	if (IS_ERR(device_hcd->class)) {
 		LOGE(tcm_hcd->pdev->dev.parent,
@@ -507,16 +516,24 @@ static int device_create_class(void)
 		return -ENODEV;
 	}
 
-	device_hcd->class->devnode = device_devnode;
+	//device_hcd->class->devnode = device_devnode;
 
 	return 0;
 }
 
 static const struct file_operations device_fops = {
 	.owner = THIS_MODULE,
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5, 15, 0))
 	.unlocked_ioctl = device_ioctl,
 #ifdef HAVE_COMPAT_IOCTL
 	.compat_ioctl = device_ioctl,
+#endif
+#else
+#ifdef HAVE_UNLOCKED_IOCTL
+	.unlocked_ioctl = device_ioctl,
+#else
+	.ioctl = device_ioctl,
+#endif
 #endif
 	.llseek = device_llseek,
 	.read = device_read,
@@ -596,13 +613,13 @@ static int device_init(struct ovt_tcm_hcd *tcm_hcd)
 	}
 
 	if (bdata->irq_gpio >= 0) {
-		retval = gpio_export(bdata->irq_gpio, false);
+		retval = gpiod_export(gpio_to_desc(bdata->irq_gpio), false);
 		if (retval < 0) {
 			LOGE(tcm_hcd->pdev->dev.parent,
 					"Failed to export GPIO\n");
 		} else {
-			retval = gpio_export_link(&tcm_hcd->pdev->dev,
-					"attn", bdata->irq_gpio);
+			retval = gpiod_export_link(&tcm_hcd->pdev->dev,
+					"attn", gpio_to_desc(bdata->irq_gpio));
 			if (retval < 0) {
 				LOGE(tcm_hcd->pdev->dev.parent,
 						"Failed to export GPIO link\n");

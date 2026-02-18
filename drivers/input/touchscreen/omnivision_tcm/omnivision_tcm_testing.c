@@ -44,6 +44,8 @@
 #include <linux/rtc.h>
 #include <linux/vmalloc.h>
 
+
+
 #include "omnivision_tcm_core.h"
 #include "omnivision_tcm_testing.h"
 
@@ -343,27 +345,6 @@ static int ovt_tcm_get_thr_from_csvfile(void)
 			threshold->lcd_noise_max_limits, rows, cols);
 	if (ret) {
 		printk("ovt tcm csv parser: %s: Failed get %s \n", __func__, CSV_LCD_NOISE_ARRAY);
-		return ret;
-	}
-
-	ret = ovt_tcm_parse_csvfile(file_path, CSV_PT17_MAX_ARRAY,
-			threshold->pt17_max_limits, rows, cols);
-	if (ret) {
-		printk("ovt tcm csv parser: %s: Failed get %s \n", __func__, CSV_PT17_MAX_ARRAY);
-		return ret;
-	}
-
-	ret = ovt_tcm_parse_csvfile(file_path, CSV_PT18_MIN_ARRAY,
-			threshold->pt18_min_limits, rows, cols);
-	if (ret) {
-		printk("ovt tcm csv parser: %s: Failed get %s \n", __func__, CSV_PT18_MIN_ARRAY);
-		return ret;
-	}
-
-	ret = ovt_tcm_parse_csvfile(file_path, CSV_PT18_MAX_ARRAY,
-			threshold->pt18_max_limits, rows, cols);
-	if (ret) {
-		printk("ovt tcm csv parser: %s: Failed get %s \n", __func__, CSV_PT18_MAX_ARRAY);
 		return ret;
 	}
 
@@ -769,14 +750,14 @@ static int testing_device_id(void)
 static int testing_config_id(void)
 {
 	struct ovt_tcm_hcd *tcm_hcd = testing_hcd->tcm_hcd;
-	struct ovt_tcm_app_info *app_info;
+	//struct ovt_tcm_app_info *app_info;
 	int i;
 
 	LOGN(tcm_hcd->pdev->dev.parent,
 			"Start testing\n");
 	testing_hcd->result = false;
 
-	app_info = &tcm_hcd->app_info;
+	//app_info = &tcm_hcd->app_info;
 
 	testing_hcd->result = true;
 	for (i = 0; i < sizeof(config_id_limit); i++) {
@@ -1030,7 +1011,9 @@ static int testing_pt01_trx_trx_short(void)
 	int i, j;
 	int phy_pin;
 	bool do_pin_test = false;
+#ifdef PT1_GET_PIN_ASSIGNMENT
 	struct ovt_tcm_app_info *app_info;
+#endif
 	struct ovt_tcm_hcd *tcm_hcd = testing_hcd->tcm_hcd;
 	unsigned int size;
 	unsigned char limit;
@@ -1045,9 +1028,9 @@ static int testing_pt01_trx_trx_short(void)
 			"Start testing\n");
 	testing_hcd->result = false;
 
+#ifdef PT1_GET_PIN_ASSIGNMENT
 	app_info = &tcm_hcd->app_info;
 
-#ifdef PT1_GET_PIN_ASSIGNMENT
 	satic_cfg_length = le2_to_uint(app_info->static_config_size);
 
 	if (!testing_hcd->satic_cfg_buf) {
@@ -1626,53 +1609,22 @@ exit:
 	return (testing_hcd->result)? 0 : -1;
 }
 
-static char *get_date_time_str(void)
-{
-	static char time_data_buf[128] = { 0 };
-
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(4, 14, 0)
-	struct timespec now_time;
-	struct rtc_time rtc_now_time;
-
-	getnstimeofday(&now_time);
-	rtc_time_to_tm(now_time.tv_sec, &rtc_now_time);
-	snprintf(time_data_buf, sizeof(time_data_buf), "%04d%02d%02d-%02d%02d%02d",
-		(rtc_now_time.tm_year + 1900), rtc_now_time.tm_mon + 1,
-		rtc_now_time.tm_mday, rtc_now_time.tm_hour, rtc_now_time.tm_min,
-		rtc_now_time.tm_sec);
-#else
-	struct tm tm;
-	time64_to_tm(ktime_get_real_seconds(), 0, &tm);
-
-	snprintf(time_data_buf, sizeof(time_data_buf), "%04d%02d%02d-%02d%02d%02d",
-		(int)(tm.tm_year + 1900), tm.tm_mon + 1,
-		tm.tm_mday, tm.tm_hour, tm.tm_min,
-		tm.tm_sec);
-#endif
-
-	return time_data_buf;
-}
-
 static int testing_do_testing(void)
 {
 	int retval;
     int error_count = 0;
-	unsigned int rows;
-	unsigned int cols;
-	struct ovt_tcm_app_info *app_info;
+	//unsigned int rows;
+	//unsigned int cols;
+	//struct ovt_tcm_app_info *app_info;
 	struct ovt_tcm_hcd *tcm_hcd = testing_hcd->tcm_hcd;
 
 #ifdef LIMIT_FROM_CSV_FILE
-  char file_path[256];
+    uint8_t file_path[256];
 	struct file *fp = NULL;
+    mm_segment_t old_fs;
 	loff_t pos;
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(4, 14, 0)
-  mm_segment_t old_fs;
+    struct rtc_time rtc_now_time;
 #endif
-#endif
-	app_info = &tcm_hcd->app_info;
-	rows = le2_to_uint(app_info->num_of_image_rows);
-	cols = le2_to_uint(app_info->num_of_image_cols);
 
 	if (!g_testing_output_buf) {
 		g_testing_output_buf = vmalloc(OUTPUT_TO_CSV_STRING_LEN);
@@ -1713,16 +1665,6 @@ static int testing_do_testing(void)
 	if (retval < 0) {
 		error_count++;
 	}
-	retval = testing_do_test_item(TEST_PT17_ADC_RANGE, TX_NUM_MAX, RX_NUM_MAX, NULL, 
-		testing_hcd->testing_csv_threshold.pt17_max_limits, fp, g_testing_output_buf, OUTPUT_TO_CSV_STRING_LEN);
-	if (retval < 0) {
-		error_count++;
-	}
-	retval = testing_do_test_item(TEST_PT18_HYBRID_ABS_RAW, TX_NUM_MAX, RX_NUM_MAX, testing_hcd->testing_csv_threshold.pt18_min_limits, 
-		testing_hcd->testing_csv_threshold.pt18_max_limits, fp, g_testing_output_buf, OUTPUT_TO_CSV_STRING_LEN);
-	if (retval < 0) {
-		error_count++;
-	}
 #else
 	retval = testing_do_test_item(TEST_PT7_DYNAMIC_RANGE, TEST_LIMIT_ROW_CNT, TEST_LIMIT_COL_CNT, pt7_low_limits_new, 
 		pt7_hi_limits_new, NULL, g_testing_output_buf, OUTPUT_TO_CSV_STRING_LEN);
@@ -1752,25 +1694,32 @@ static int testing_do_testing(void)
 	}
 #endif
 #ifdef LIMIT_FROM_CSV_FILE
+	rtc_time_to_tm(get_seconds(), &rtc_now_time);
 	if (error_count) {
 		//test fail result
-		sprintf(file_path, "/data/tp_%s_test_data_%s-fail.csv", tcm_hcd->id_info.part_number,get_date_time_str());
+		sprintf(file_path, "/data/tp_%s_test_data_%02d%02d%02d-%02d%02d%02d-fail.csv", tcm_hcd->id_info.part_number,
+            (rtc_now_time.tm_year + 1900) % 100, rtc_now_time.tm_mon + 1, rtc_now_time.tm_mday,
+            rtc_now_time.tm_hour, rtc_now_time.tm_min, rtc_now_time.tm_sec);
 	} else {
 		//test pass result
-		sprintf(file_path, "/data/tp_%s_test_data_%s-success.csv", tcm_hcd->id_info.part_number,get_date_time_str());
+		sprintf(file_path, "/data/tp_%s_test_data_%02d%02d%02d-%02d%02d%02d-success.csv", tcm_hcd->id_info.part_number,
+            (rtc_now_time.tm_year + 1900) % 100, rtc_now_time.tm_mon + 1, rtc_now_time.tm_mday,
+            rtc_now_time.tm_hour, rtc_now_time.tm_min, rtc_now_time.tm_sec);
 	}
-	fp = filp_open(file_path, O_WRONLY | O_CREAT | O_TRUNC, 644);
-	if (IS_ERR_OR_NULL(fp)) {
-			printk("ovt tcm Open log file '%s' failed.\n", file_path);
+    
+    old_fs = get_fs();
+    set_fs(KERNEL_DS);
+    fp = filp_open(file_path, O_WRONLY | O_CREAT | O_TRUNC, 0);
+    if (IS_ERR_OR_NULL(fp)) {
+        printk("ovt tcm Open log file '%s' failed.\n", file_path);
 
-	snprintf(g_testing_output_buf + strlen(g_testing_output_buf), OUTPUT_TO_CSV_STRING_LEN - strlen(g_testing_output_buf), 
-		"can not open file:%s\n", file_path);
-			goto sys_err;
-	}
+		snprintf(g_testing_output_buf + strlen(g_testing_output_buf), OUTPUT_TO_CSV_STRING_LEN - strlen(g_testing_output_buf), 
+			"can not open file:%s\n", file_path);
+        set_fs(old_fs);
+        goto sys_err;
+    }
+
 	pos = 0;
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(4, 14, 0)
-	old_fs = get_fs();
-	set_fs(KERNEL_DS);
 	vfs_write(fp, g_testing_output_buf, strlen(g_testing_output_buf), &pos);
 	printk("g_testing_output_buf , strlen is %d\n", (int)strlen(g_testing_output_buf));
 	if (!IS_ERR_OR_NULL(fp)) {
@@ -1778,17 +1727,11 @@ static int testing_do_testing(void)
 		filp_close(fp, NULL);
 		fp = NULL;
 	}
-  set_fs(old_fs);
-#else
-	kernel_write(fp, g_testing_output_buf, strlen(g_testing_output_buf), &pos);
-	filp_close(fp, NULL);
+    set_fs(old_fs);
 #endif
-#endif
-
 #ifdef LIMIT_FROM_CSV_FILE
 sys_err:
 #endif
-
 	if (error_count) {
 		return -1;
 	}

@@ -42,8 +42,7 @@
 #define ENABLE_SYS_ZEROFLASH true
 
 //#define FW_IMAGE_NAME "omnivision/hdl_firmware.img"
-#define FW_IMAGE_NAME "hdl_firmware.img"
-
+#define FW_IMAGE_NAME "PR2100132525-td4160c_TM6.56_lvb_spi_hdl.img"
 #define BOOT_CONFIG_ID "BOOT_CONFIG"
 
 #define F35_APP_CODE_ID "F35_APP_CODE"

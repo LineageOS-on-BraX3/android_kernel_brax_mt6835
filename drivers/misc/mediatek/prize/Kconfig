@@ -158,4 +158,10 @@ config DRV_ZKWBD_EN
 	tristate "zkwbeidou_en Driver"
 	default n
 	help
-	  DRV_ZKWBD_EN.	  
+	  DRV_ZKWBD_EN.
+          
+source "drivers/misc/mediatek/prize/cs_notifier/Kconfig"
+
+# pri added for SL005TC-231 20250610 begin
+source "drivers/misc/mediatek/prize/cs_usb_broadcast/Kconfig"
+# pri added for SL005TC-231 20250610 end

@@ -44,6 +44,43 @@ static struct ovt_tcm_hw_interface hw_if;
 
 static struct platform_device *ovt_tcm_i2c_device;
 
+#ifdef CONFIG_DRM
+static struct drm_panel *active_tcm_panel;
+
+struct drm_panel *tcm_get_panel(void)
+{
+	return active_tcm_panel;
+}
+
+EXPORT_SYMBOL(tcm_get_panel);
+
+static int ovt_tcm_check_dt(struct device_node *np)
+{
+	int i;
+	int count;
+	struct device_node *node;
+	struct drm_panel *panel;
+
+	printk("%s, enter\n", __func__);
+	count = of_count_phandle_with_args(np, "panel", NULL);
+	if (count <= 0)
+		return 0;
+
+	for (i = 0; i < count; i++) {
+		node = of_parse_phandle(np, "panel", i);
+		panel = of_drm_find_panel(node);
+		of_node_put(node);
+		if (!IS_ERR(panel)) {
+			printk("%s, active_tcm_panel find ok\n", __func__);
+			active_tcm_panel = panel;
+			return 0;
+		}
+	}
+	printk("%s, find panel error exit\n", __func__);
+	return PTR_ERR(panel);
+}
+#endif
+
 #ifdef CONFIG_OF
 static int parse_dt(struct device *dev, struct ovt_tcm_board_data *bdata)
 {
@@ -53,6 +90,11 @@ static int parse_dt(struct device *dev, struct ovt_tcm_board_data *bdata)
 	struct device_node *np = dev->of_node;
 	const char *name;
 
+#ifdef CONFIG_DRM
+	retval = ovt_tcm_check_dt(np);
+	if (retval == -EPROBE_DEFER)
+		return retval;
+#endif
 	prop = of_find_property(np, "omnivision,irq-gpio", NULL);
 	if (prop && prop->length) {
 		bdata->irq_gpio = of_get_named_gpio_flags(np,

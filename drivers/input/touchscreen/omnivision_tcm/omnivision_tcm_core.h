@@ -37,32 +37,29 @@
 #include <linux/input.h>
 #include <linux/delay.h>
 #include <linux/platform_device.h>
-#if IS_ENABLED(CONFIG_DRM_MEDIATEK)
+#if IS_ENABLED(CONFIG_DRM_MEDIATEK_V2)
 #include "mtk_disp_notify.h"
 #include "mtk_panel_ext.h"
 #elif IS_ENABLED(CONFIG_FB)
 #include <linux/notifier.h>
 #include <linux/fb.h>
 #endif
-
 #include <linux/slab.h>
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(4, 20, 0))
 	#include <linux/sched/signal.h>
 #endif
 
 #include "omnivision_tcm_config.h"
+/* pri added for SL005TC-231 notifier 20250609 begin */
+#if IS_ENABLED(CONFIG_CS_NOTIFIER)
+#include <../../../../misc/mediatek/prize/cs_notifier/cs_notifier.h>
+#endif
+/* pri added for SL005TC-231 notifier 20250609 end */
 
 #define I2C_MODULE_NAME "omniVision_tcm_i2c"
 #define SPI_MODULE_NAME "omnivision_tcm_spi"
 
-#ifdef CONFIG_OVT_CHARGER_DETECT
-#include "omnivision_tcm_charger.h"
-#endif
-
-#ifdef CONFIG_OVT_EARJACK_DETECT
-#include "omnivision_tcm_earjack.h"
-#endif
-
+//#define CONFIG_OVT_CHARGER_DETECT
 struct ovt_tcm_board_data {
 	bool x_flip;
 	bool y_flip;
@@ -97,9 +94,10 @@ struct ovt_tcm_board_data {
 #define TOUCH_INPUT_NAME "omnivision_tcm_touch"
 #define TOUCH_INPUT_PHYS_PATH "omnivision_tcm/touch_input"
 
+#define WAKEUP_GESTURE (1)
 
-#define OMNIVISION_TCM_CHARGER_MODE_EN 			(0)
-#define OMNIVISION_TCM_GLOVE_MODE_EN 			(1)//drv modify by kuangliangjun for glove mode function 20241010 start
+#define SPEED_UP_RESUME 0
+
 
 /* The chunk size RD_CHUNK_SIZE/WR_CHUNK_SIZE will not apply in HDL sensors */
 #define RD_CHUNK_SIZE 256 /* read length limit in bytes, 0 = unlimited */
@@ -220,10 +218,6 @@ enum module_type {
 #ifdef CONFIG_OVT_CHARGER_DETECT
 	TCM_CHARGER_DETECT = 6,
 #endif
-#ifdef CONFIG_OVT_EARJACK_DETECT
-	TCM_EARJACK_DETECT = 7,
-#endif
-
 	TCM_LAST,
 };
 
@@ -339,6 +333,16 @@ enum status_code {
 	STATUS_NOT_IMPLEMENTED = 0x0e,
 	STATUS_ERROR = 0x0f,
 	STATUS_INVALID = 0xff,
+};
+
+enum face_status {
+	FACE_FAR_FROM_1_2_3_CLOSE_WHEN_SCREEN_ON = 0x00,
+	FACE_CLOSE_1_SMALL_SIGNAL = 0x01,
+	FACE_CLOSE_2_ENOUGH_SIGNAL = 0x02,
+	FACE_CLOSE_3_ENOUGH_SIGNAL = 0x03,
+	FACE_CLOSE_FROM_1_2_3_CLOSE_WHEN_SCREEN_OFF = 0x04,
+	FACE_FAR_FROM_1_2_3_CLOSE_WHEN_SCREEN_OFF = 0x05,
+	FACE_STATUS_NONE = 0x0f,
 };
 
 enum report_type {
@@ -503,6 +507,18 @@ struct ovt_tcm_hcd {
 	bool in_hdl_mode;
 	bool is_detected;
 	bool wakeup_gesture_enabled;
+/* pri added for SL005TC-231 notifier 20250609 begin */
+#if IS_ENABLED(CONFIG_CS_NOTIFIER)
+#if IS_ENABLED(CONFIG_TOUCHSCREEN_OMNIVISION_TCM_CHARGER)
+	struct notifier_block usb_notifier;
+	bool usb_state;
+#endif
+#if IS_ENABLED(CONFIG_TOUCHSCREEN_OMNIVISION_TCM_EAR_PHONE)
+	struct notifier_block earphone_notifier;
+	bool earphone_state;
+#endif
+#endif
+/* pri added for SL005TC-231 notifier 20250609 end */
     bool ovt_tcm_driver_removing;
 	unsigned char sensor_type;
 	unsigned char fb_ready;
@@ -516,6 +532,12 @@ struct ovt_tcm_hcd {
 	unsigned int rd_chunk_size;
 	unsigned int wr_chunk_size;
 	unsigned int app_status;
+
+	unsigned int func_ear_phone_connected_en;
+	unsigned int func_charger_connected_en;
+	unsigned int func_roate_horizontal_level_en;
+	unsigned int func_face_detect_en;
+
 	struct platform_device *pdev;
 	struct regulator *pwr_reg;
 	struct regulator *bus_reg;
@@ -530,9 +552,14 @@ struct ovt_tcm_hcd {
 	struct mutex suspend_resume_mutex;
 	struct mutex identify_mutex;
 	struct delayed_work polling_work;
+#ifdef CONFIG_OVT_CHARGER_DETECT
+    struct workqueue_struct *workqueue;
+#endif
 	struct workqueue_struct *polling_workqueue;
 	struct task_struct *notifier_thread;
+#if defined(CONFIG_DRM) || defined(CONFIG_FB)
 	struct notifier_block fb_notifier;
+#endif
 	struct ovt_tcm_buffer in;
 	struct ovt_tcm_buffer out;
 	struct ovt_tcm_buffer resp;
@@ -552,23 +579,8 @@ struct ovt_tcm_hcd {
 	struct ovt_tcm_watchdog watchdog;
 	struct ovt_tcm_features features;
 	const struct ovt_tcm_hw_interface *hw_if;
-//drv-modify by shenwenbin for TP charger mode 20240304 start
-#if OMNIVISION_TCM_CHARGER_MODE_EN
-	unsigned short charger_mode;
-	int charger_status;
-	char *psy_name;
-	struct notifier_block notifier_charger;
-	struct delayed_work switch_charger_mode_work;
-	struct workqueue_struct *switch_charger_mode_workqueue;
-#endif
-//drv-modify by shenwenbin for TP charger mode 20240304 end
-//drv modify by kuangliangjun for glove mode function 20241010 start
-#if OMNIVISION_TCM_GLOVE_MODE_EN
-	unsigned short glove_mode_enable;
-#endif
-//drv modify by kuangliangjun for glove mode function 20241010 end
-#ifdef CONFIG_TOUCHSCREEN_OMNIVISION_TCM_EAR_PHONE
-    unsigned short earphone_mode;
+#ifdef CONFIG_OVT_CHARGER_DETECT
+    void *charger_detect_data;
 #endif
 	int (*reset)(struct ovt_tcm_hcd *tcm_hcd);
 	int (*reset_n_reinit)(struct ovt_tcm_hcd *tcm_hcd, bool hw, bool update_wd);
@@ -655,9 +667,12 @@ int ovt_tcm_add_module(struct ovt_tcm_module_cb *mod_cb, bool insert);
 int touch_init(struct ovt_tcm_hcd *tcm_hcd);
 int touch_remove(struct ovt_tcm_hcd *tcm_hcd);
 int touch_reinit(struct ovt_tcm_hcd *tcm_hcd);
+int touch_early_suspend(struct ovt_tcm_hcd *tcm_hcd);
 int touch_suspend(struct ovt_tcm_hcd *tcm_hcd);
 int touch_resume(struct ovt_tcm_hcd *tcm_hcd);
-
+#ifdef CONFIG_DRM
+struct drm_panel *tcm_get_panel(void);
+#endif
 #ifdef BUILD_AS_KO_MODULE
 int device_module_init(void);
 int	reflash_module_init(void);
@@ -666,7 +681,6 @@ int	zeroflash_module_init(void);
 int	diag_module_init(void);
 int	recovery_module_init(void);
 #endif
-
 static inline int ovt_tcm_rmi_read(struct ovt_tcm_hcd *tcm_hcd,
 		unsigned short addr, unsigned char *data, unsigned int length)
 {
@@ -813,6 +827,15 @@ static inline unsigned int ceil_div(unsigned int dividend, unsigned divisor)
 	return (dividend + divisor - 1) / divisor;
 }
 
-extern int ovt_tcm_set_dynamic_config_host_interface(unsigned char id, unsigned short value);
+extern int ovt_tcm_set_func_charger_connected_en_state(unsigned short value);
+extern int ovt_tcm_set_func_face_detect_en_state(unsigned short value);
+extern int ovt_tcm_set_func_ear_phone_connected_en_state(unsigned short value);
+extern int ovt_tcm_set_func_roate_horizontal_level_en_state(unsigned short value);
+
+#ifdef CONFIG_OVT_CHARGER_DETECT
+extern int ovt_start_charger_detect(struct ovt_tcm_hcd *tcm_hcd);
+extern int ovt_stop_charger_detect(struct ovt_tcm_hcd *tcm_hcd);
+int  charger_module_init(void);
+#endif
 
 #endif

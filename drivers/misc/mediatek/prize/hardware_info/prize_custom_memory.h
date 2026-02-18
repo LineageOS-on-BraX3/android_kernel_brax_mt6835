@@ -7,4 +7,5 @@ char Cust_emmc_support[][50]={     /* idx in qvl_list */
 {"RL : RS1G32LO4D2BDS-53BT"},      /* 13 */
 {"FB : FLXC2004G-N1"},             /* 14 */
 {"U3 : K4UBE3D4AB_MGCL"},          /* 15 */
+{"H9 : H9HCNNNFAMALTR-NEE"},       /* 16 */
 };

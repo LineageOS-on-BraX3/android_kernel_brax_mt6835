@@ -164,6 +164,22 @@
 			};
 		};
 	};
+	panel4@3 {
+		compatible = "truly,td4160c,vdo";
+		reg = <3>;
+		pm-enable-gpios = <&pio 43 0>;
+		reset-gpios = <&pio 86 0>;
+		bias-gpios = <&pio 150 0>,
+				<&pio 151 0>;
+		gate-ic = <4831>;
+		lcd_vdd-supply = <&mt6377_vaud18>;
+		pinctrl-names = "default";
+		port {
+			panel_in4: endpoint {
+				remote-endpoint = <&dsi_out4>;
+			};
+		};
+	};
 	ports {
 		port {
 			dsi_out: endpoint {
@@ -174,6 +190,9 @@
 			};
 			dsi_out3: endpoint3 {
 				remote-endpoint = <&panel_in3>;
+			};
+			dsi_out4: endpoint4 {
+				remote-endpoint = <&panel_in4>;
 			};
 		};
 	};

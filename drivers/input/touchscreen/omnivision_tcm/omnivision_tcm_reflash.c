@@ -42,8 +42,8 @@
 
 #define CUSTOM_DIR_NAME "custom"
 
-#define FW_IMAGE_NAME "hdl_firmware.img"
-
+//#define FW_IMAGE_NAME "omnivision/reflash_firmware.img"
+#define FW_IMAGE_NAME "PR2100127979-td4160c_TM6.56_lvb_spi_hdl.img"
 #define FW_IMAGE_NAME_MANUAL "omnivision/reflash_firmware_manual.img"
 
 #define BOOT_CONFIG_ID "BOOT_CONFIG"

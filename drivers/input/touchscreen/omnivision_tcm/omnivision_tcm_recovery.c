@@ -200,7 +200,7 @@ static int recovery_parse_romboot_ihex(void)
 	unsigned int data0;
 	unsigned int data1;
 	unsigned int count;
-	unsigned int words;
+	//unsigned int words;
 	unsigned int offset;
 	unsigned int record;
 	struct ovt_tcm_hcd *tcm_hcd = recovery_hcd->tcm_hcd;
@@ -212,7 +212,7 @@ static int recovery_parse_romboot_ihex(void)
 		return -ENOBUFS;
 	}
 
-	words = 0;
+	//words = 0;
 	offset = 0;
 	buf = recovery_hcd->ihex_buf;
 	recovery_hcd->data_entries = 0;
@@ -256,7 +256,7 @@ static int recovery_parse_romboot_ihex(void)
 				return retval;
 			}
 
-			words++;
+			//words++;
 		} else if (type == 0x02) {
 			offset = (data0 << 8) + data1;
 			offset <<= 4;
@@ -870,7 +870,7 @@ static int recovery_write_flash(void)
 	int retval;
 	unsigned char *data_ptr;
 	unsigned int chunk_buf_size;
-	unsigned int chunk_data_size;
+	//unsigned int chunk_data_size;
 	unsigned int entries_written;
 	unsigned int entries_to_write;
 	struct ovt_tcm_hcd *tcm_hcd = recovery_hcd->tcm_hcd;
@@ -881,7 +881,7 @@ static int recovery_write_flash(void)
 
 	chunk_buf_size = sizeof(recovery_hcd->chunk_buf);
 
-	chunk_data_size = chunk_buf_size - 1;
+	//chunk_data_size = chunk_buf_size - 1;
 
 	recovery_hcd->chunk_buf[chunk_buf_size - 1] = F35_WRITE_CHUNK_COMMAND;
 
@@ -1207,9 +1207,6 @@ static int recovery_init(struct ovt_tcm_hcd *tcm_hcd)
 {
 	int retval;
 	int idx;
-
-	if (tcm_hcd->in_hdl_mode)
-		return 0;
 
 	recovery_hcd = kzalloc(sizeof(*recovery_hcd), GFP_KERNEL);
 	if (!recovery_hcd) {

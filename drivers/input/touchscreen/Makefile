@@ -126,3 +126,6 @@ obj-$(CONFIG_TOUCHSCREEN_MT6985_ALPHA_SUPPORT) += k6985v1_64_flip_alpha/
 endif
 
 obj-$(CONFIG_TOUCHSCREEN_FTS_8057S)	+= focaltech_ft8057s/
+
+obj-$(CONFIG_TOUCHSCREEN_OMNIVISION_TCM) += omnivision_tcm/
+

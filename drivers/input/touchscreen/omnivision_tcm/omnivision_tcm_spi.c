@@ -31,14 +31,6 @@
 #include <linux/of_gpio.h>
 #include "omnivision_tcm_core.h"
 
-//drv modify by kuangliangjun for judge charger mode 20241126 start 
-struct tag_bootmode {
-	u32 size;
-	u32 tag;
-	u32 bootmode;
-	u32 boottype;
-};
-//drv modify by kuangliangjun for judge charger mode 20241126 end 
 static unsigned char *buf;
 
 static unsigned int buf_size;
@@ -50,31 +42,43 @@ static struct ovt_tcm_bus_io bus_io;
 static struct ovt_tcm_hw_interface hw_if;
 
 static struct platform_device *ovt_tcm_spi_device;
+#ifdef CONFIG_DRM
+static struct drm_panel *active_tcm_panel;
 
-#ifdef CONFIG_OF
-//drv modify by kuangliangjun for judge charger mode 20241126 start
-static int ovt_charger_parse_dt(struct device *dev)
+struct drm_panel *tcm_get_panel(void)
 {
-	struct device_node *boot_node = NULL;
-	struct tag_bootmode *tag = NULL;
+	return active_tcm_panel;
+}
 
-	boot_node = of_parse_phandle(dev->of_node, "bootmode", 0);
-	if (!boot_node)
-		printk("%s: failed to get boot mode phandle\n", __func__);
-	else {
-		tag = (struct tag_bootmode *)of_get_property(boot_node,
-							"atag,boot", NULL);
-		if (!tag)
-			printk("%s: failed to get atag,boot\n", __func__);
-		else {
-			printk("%s: bootmode:0x%x\n",__func__, tag->bootmode);
-			return tag->bootmode;
+EXPORT_SYMBOL(tcm_get_panel);
+
+static int ovt_tcm_check_dt(struct device_node *np)
+{
+	int i;
+	int count;
+	struct device_node *node;
+	struct drm_panel *panel;
+
+	printk("%s, enter\n", __func__);
+	count = of_count_phandle_with_args(np, "panel", NULL);
+	if (count <= 0)
+		return 0;
+
+	for (i = 0; i < count; i++) {
+		node = of_parse_phandle(np, "panel", i);
+		panel = of_drm_find_panel(node);
+		of_node_put(node);
+		if (!IS_ERR(panel)) {
+			printk("%s, active_tcm_panel find ok\n", __func__);
+			active_tcm_panel = panel;
+			return 0;
 		}
 	}
-	return 0;
+	printk("%s, find panel error exit\n", __func__);
+	return PTR_ERR(panel);
 }
-//drv modify by kuangliangjun for judge charger mode 20241126 end
-
+#endif
+#ifdef CONFIG_OF
 static int parse_dt(struct device *dev, struct ovt_tcm_board_data *bdata)
 {
 	int retval;
@@ -82,12 +86,15 @@ static int parse_dt(struct device *dev, struct ovt_tcm_board_data *bdata)
 	struct property *prop;
 	struct device_node *np = dev->of_node;
 	const char *name;
-
+#ifdef CONFIG_DRM
+	retval = ovt_tcm_check_dt(np);
+	if (retval == -EPROBE_DEFER)
+		return retval;
+#endif
 	prop = of_find_property(np, "omnivision,irq-gpio", NULL);
 	if (prop && prop->length) {
-		bdata->irq_gpio = of_get_named_gpio_flags(np,
-				"omnivision,irq-gpio", 0,
-				(enum of_gpio_flags *)&bdata->irq_flags);
+		bdata->irq_gpio = of_get_named_gpio(np,
+				"omnivision,irq-gpio", 0);
 	} else {
 		bdata->irq_gpio = -1;
 	}
@@ -112,8 +119,7 @@ static int parse_dt(struct device *dev, struct ovt_tcm_board_data *bdata)
 
 	prop = of_find_property(np, "omnivision,power-gpio", NULL);
 	if (prop && prop->length) {
-		bdata->power_gpio = of_get_named_gpio_flags(np,
-				"omnivision,power-gpio", 0, NULL);
+		bdata->power_gpio = of_get_named_gpio(np,"omnivision,power-gpio", 0);
 	} else {
 		bdata->power_gpio = -1;
 	}
@@ -150,8 +156,8 @@ static int parse_dt(struct device *dev, struct ovt_tcm_board_data *bdata)
 
 	prop = of_find_property(np, "omnivision,reset-gpio", NULL);
 	if (prop && prop->length) {
-		bdata->reset_gpio = of_get_named_gpio_flags(np,
-				"omnivision,reset-gpio", 0, NULL);
+		bdata->reset_gpio = of_get_named_gpio(np,
+				"omnivision,reset-gpio", 0);
 	} else {
 		bdata->reset_gpio = -1;
 	}
@@ -203,8 +209,8 @@ static int parse_dt(struct device *dev, struct ovt_tcm_board_data *bdata)
 
 	prop = of_find_property(np, "omnivision,tpio-reset-gpio", NULL);
 	if (prop && prop->length) {
-		bdata->tpio_reset_gpio = of_get_named_gpio_flags(np,
-				"omnivision,tpio-reset-gpio", 0, NULL);
+		bdata->tpio_reset_gpio = of_get_named_gpio(np,
+				"omnivision,tpio-reset-gpio", 0);
 	} else {
 		bdata->tpio_reset_gpio = -1;
 	}
@@ -610,7 +616,6 @@ exit:
 static int ovt_tcm_spi_probe(struct spi_device *spi)
 {
 	int retval;
-	u32 bootmode = 0;//drv modify by kuangliangjun for judge charger mode 20241126
 
 	if (spi->master->flags & SPI_MASTER_HALF_DUPLEX) {
 		LOGE(&spi->dev,
@@ -632,17 +637,6 @@ static int ovt_tcm_spi_probe(struct spi_device *spi)
 				"Failed to allocate memory for board data\n");
 		return -ENOMEM;
 	}
-//drv modify by kuangliangjun for judge charger mode 20241126 start
-	bootmode = ovt_charger_parse_dt(&spi->dev);
-	if(bootmode == 8 || bootmode == 9){
-		LOGE(&spi->dev,
-				"charger mode dump load TP driver,bootmode=%d\n",bootmode);
-		return -ENOMEM;
-	}else{
-		LOGE(&spi->dev,
-				"normal mode,bootmode=%d\n",bootmode);
-	}
-//drv modify by kuangliangjun for judge charger mode 20241126 end
 	parse_dt(&spi->dev, hw_if.bdata);
 #else
 	hw_if.bdata = spi->dev.platform_data;
@@ -672,6 +666,10 @@ static int ovt_tcm_spi_probe(struct spi_device *spi)
 	hw_if.bus_io = &bus_io;
 
 	spi->bits_per_word = 8;
+	/* pri add for SL005TC-1126 20250704 start */
+	spi->cs_setup.value = 6;
+	spi->cs_setup.unit = 0;
+	/* pri add for SL005TC-1126 20250704 end */
 
 	retval = spi_setup(spi);
 	if (retval < 0) {

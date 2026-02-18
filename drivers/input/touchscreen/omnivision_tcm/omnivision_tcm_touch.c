@@ -34,22 +34,17 @@
 
 #define TYPE_B_PROTOCOL
 
-#define REPORT_Z_MAJOR_VALUE
+//#define REPORT_Z_MAJOR_VALUE
 #define MAX_Z_VALUE 1000
 #define MAX_MAJOR_VALUE 255
-#define MAX_MINOR_VALUE 255
+
+//#define USE_DEFAULT_TOUCH_REPORT_CONFIG
 
 #define TOUCH_REPORT_CONFIG_SIZE 128
 
-#if IS_ENABLED(CONFIG_PRIZE_UNDERWATER_TOUCH_CONTROL)
-extern bool underwater_report_status;
-#endif
+#define SUPPORT_FACE_DETECT 0
 
-//#define SUPPORT_FACE_DETECT
-//#define SUPPORT_KNUCKLE_DATA_REPORT
-//#define SUPPORT_DEBUG_FRAME_DATA
-
-//#define USE_DEFAULT_TOUCH_REPORT_CONFIG
+#define SUPPORT_KNUCKLE_DATA_REPORT 0
 
 enum touch_status {
 	LIFT = 0,
@@ -97,24 +92,11 @@ enum touch_report_code {
 	TOUCH_TUNING_GAUSSIAN_WIDTHS = 0x80,
 	TOUCH_TUNING_SMALL_OBJECT_PARAMS,
 	TOUCH_TUNING_0D_BUTTONS_VARIANCE,
-#ifdef SUPPORT_KNUCKLE_DATA_REPORT
+#if SUPPORT_KNUCKLE_DATA_REPORT
 	TOUCH_KNUCKLE_DATA = 0xca,
 #endif
   TOUCH_REPORT_PALM_DETECTED = 200,
-	TOUCH_FRAME_DATA = 0xCB,
-	TOUCH_5_LINE_INFO = 0xCC,
 };
-
-enum face_status {
-	FACE_FAR_FROM_1_2_3_CLOSE_WHEN_SCREEN_ON = 0x00,
-	FACE_CLOSE_1_SMALL_SIGNAL = 0x01,
-	FACE_CLOSE_2_ENOUGH_SIGNAL = 0x02,
-	FACE_CLOSE_3_ENOUGH_SIGNAL = 0x03,
-	FACE_CLOSE_FROM_1_2_3_CLOSE_WHEN_SCREEN_OFF = 0x04,
-	FACE_FAR_FROM_1_2_3_CLOSE_WHEN_SCREEN_OFF = 0x05,
-	FACE_STATUS_NONE = 0x0f,
-};
-
 
 struct object_data {
 	unsigned char status;
@@ -133,7 +115,7 @@ struct input_params {
 	unsigned int max_objects;
 };
 
-#ifdef SUPPORT_KNUCKLE_DATA_REPORT
+#if SUPPORT_KNUCKLE_DATA_REPORT
 #define KNUCKLE_DATA_SIZE 102
 #endif
 struct touch_data {
@@ -153,11 +135,9 @@ struct touch_data {
 	unsigned int fd_data;
 	unsigned int force_data;
 	unsigned int fingerprint_area_meet;
-#ifdef SUPPORT_KNUCKLE_DATA_REPORT
+#if SUPPORT_KNUCKLE_DATA_REPORT
 	unsigned char knuckle_data[KNUCKLE_DATA_SIZE];
 #endif
-	unsigned char frame_data[40*20*2];
-	unsigned char ifp_5_line_data[20*2*5];
 	unsigned int palm_status;
 };
 
@@ -180,56 +160,8 @@ struct touch_hcd {
 };
 
 static struct touch_hcd *touch_hcd;
-
-static void ovt_log_frame_data(unsigned char *data, unsigned int d_len, int use_signed, int col_cnt)
-{
-	unsigned int i = 0;
-	short data_value;
-	unsigned short u_data_value;
-	unsigned int data_index = 0;
-	unsigned char log_str[512] = {0};
-
-	if (col_cnt == 0) {
-		col_cnt = 18;
-	}
-
-	for (i = 0; i < d_len / 2; i++) {
-		if (use_signed) {
-			data_value = (signed short)le2_to_uint(&data[data_index * 2]);
-			snprintf(log_str + strlen(log_str), sizeof(log_str) - strlen(log_str) - 1, "%6d, ", data_value);
-		} else {
-			u_data_value = (unsigned short)le2_to_uint(&data[data_index * 2]);
-			snprintf(log_str + strlen(log_str), sizeof(log_str) - strlen(log_str) - 1, "%6d, ", u_data_value);
-		}
-		data_index++;
-		if (data_index % col_cnt == 0) {
-			//one line
-			printk("ovt-debug-frame[%d]: %s\n", (data_index / col_cnt - 1),  log_str);
-			memset(log_str, 0, sizeof(log_str));
-		}
-	}
-	if (data_index % col_cnt) {
-		printk("ovt-debug-frame[%d]: %s\n",(data_index / col_cnt), log_str);
-		memset(log_str, 0, sizeof(log_str));
-	}
-}
-
-#ifdef SUPPORT_FACE_DETECT
-static int ovt_check_face_state(int current_face_state)
-{
-	//static int pre_face_state = FACE_STATUS_NONE;
-	if ((current_face_state == FACE_FAR_FROM_1_2_3_CLOSE_WHEN_SCREEN_ON) ||
-		(current_face_state == FACE_FAR_FROM_1_2_3_CLOSE_WHEN_SCREEN_OFF)) {
-		//report far event
-		printk("tcm check face far\n");
-	} else if ((current_face_state == FACE_CLOSE_1_SMALL_SIGNAL) ||
-				(current_face_state == FACE_CLOSE_FROM_1_2_3_CLOSE_WHEN_SCREEN_OFF)) {
-
-		//report close event
-		printk("tcm check face close\n");
-	}
-	return 0;
-}
+#if SUPPORT_FACE_DETECT
+static int ovt_check_face_state(int current_face_state);
 #endif
 /**
  * touch_free_objects() - Free all touch objects
@@ -253,7 +185,6 @@ static void touch_free_objects(void)
 #ifdef REPORT_Z_MAJOR_VALUE
 		input_report_abs(touch_hcd->input_dev, ABS_MT_PRESSURE, 0);
 		input_report_abs(touch_hcd->input_dev, ABS_MT_TOUCH_MAJOR, 0);
-		input_report_abs(touch_hcd->input_dev, ABS_MT_TOUCH_MINOR, 0);
 #endif
 		input_mt_report_slot_state(touch_hcd->input_dev,
 				MT_TOOL_FINGER, 0);
@@ -362,12 +293,6 @@ static int touch_parse_report(void)
 	struct object_data *object_data;
 	struct ovt_tcm_hcd *tcm_hcd = touch_hcd->tcm_hcd;
 	static unsigned int end_of_foreach;
-	struct ovt_tcm_app_info *app_info;
-	int rows, cols;
-
-	app_info = &tcm_hcd->app_info;
-	rows = le2_to_uint(app_info->num_of_image_rows);
-	cols = le2_to_uint(app_info->num_of_image_cols);
 
 	touch_data = &touch_hcd->touch_data;
 	object_data = touch_hcd->touch_data.object_data;
@@ -711,9 +636,6 @@ static int touch_parse_report(void)
 				return retval;
 			}
 			touch_data->fd_data = data;
-#ifdef SUPPORT_FACE_DETECT
-			ovt_check_face_state(touch_data->fd_data);
-#endif
 			offset += bits;
 			break;
 		case TOUCH_TUNING_GAUSSIAN_WIDTHS:
@@ -728,7 +650,7 @@ static int touch_parse_report(void)
 			bits = config_data[idx++];
 			offset += bits;
 			break;
-#ifdef SUPPORT_KNUCKLE_DATA_REPORT
+#if SUPPORT_KNUCKLE_DATA_REPORT
 		case TOUCH_KNUCKLE_DATA:
 			bits = config_data[idx++];
 			bits = bits | (config_data[idx++] << 8);
@@ -741,36 +663,6 @@ static int touch_parse_report(void)
 			offset += bits;
 			break;
 #endif
-		case TOUCH_FRAME_DATA:
-			bits = config_data[idx++];
-			bits = bits | (config_data[idx++] << 8);
-			if (report_size - (offset / 8) < rows * cols * 2) {
-				break;
-			}
-			if ((offset % 8) || (bits % 8))
-				printk("No byte alignment for frame data\n");
-
-			secure_memcpy(touch_data->frame_data, bits/8, &tcm_hcd->report.buffer.buf[offset / 8], bits/8, bits/8);
-			printk("ovt-debug-frame  frame data start\n");
-			ovt_log_frame_data(touch_data->frame_data, bits/8, 1, cols);
-			printk("ovt-debug-frame frame data end\n");
-			offset += bits;
-			break;
-		case TOUCH_5_LINE_INFO:
-			bits = config_data[idx++];
-			bits = bits | (config_data[idx++] << 8);
-			if (report_size - (offset / 8) < cols * 5 * 2) {
-				break;
-			}
-			if ((offset % 8) || (bits % 8))
-				printk("No byte alignment for frame data\n");
-
-			secure_memcpy(touch_data->ifp_5_line_data, bits/8, &tcm_hcd->report.buffer.buf[offset / 8], bits/8, bits/8);
-			offset += bits;
-			printk("ovt-debug-frame 5 line data start\n");
-			ovt_log_frame_data(touch_data->ifp_5_line_data, bits/8, 0, cols);
-			printk("ovt-debug-frame 5 line data end\n");
-			break;
 		default:
 			bits = config_data[idx++];
 			offset += bits;
@@ -806,12 +698,6 @@ static void touch_report(void)
 	struct ovt_tcm_hcd *tcm_hcd = touch_hcd->tcm_hcd;
 	const struct ovt_tcm_board_data *bdata = tcm_hcd->hw_if->bdata;
 
-    /* drv added by kuangliangjun, touch data reporting contrl, start */
-    if (underwater_report_status == false) {
-        return;
-    }
-    /* drv added by kuangliangjun, touch data reporting contrl, end */
-	
 	if (!touch_hcd->init_touch_ok)
 		return;
 
@@ -833,14 +719,19 @@ static void touch_report(void)
 	touch_data = &touch_hcd->touch_data;
 	object_data = touch_hcd->touch_data.object_data;
 
+#if SUPPORT_FACE_DETECT
+	ovt_check_face_state(touch_data->fd_data);
+	touch_data->fd_data = FACE_STATUS_NONE;
+#endif
+
 #if WAKEUP_GESTURE
 	if (touch_data->gesture_id == GESTURE_DOUBLE_TAP &&
 			 tcm_hcd->in_suspend &&
 			 tcm_hcd->wakeup_gesture_enabled) {
 
-		input_report_key(touch_hcd->input_dev, KEY_POWER, 1);//drv modify by kuangliangjun for double tap wakeup function 20241010
+		input_report_key(touch_hcd->input_dev, KEY_WAKEUP, 1);
 		input_sync(touch_hcd->input_dev);
-		input_report_key(touch_hcd->input_dev, KEY_POWER, 0);//drv modify by kuangliangjun for double tap wakeup function 20241010
+		input_report_key(touch_hcd->input_dev, KEY_WAKEUP, 0);
 		input_sync(touch_hcd->input_dev);
 	}
 #endif
@@ -963,8 +854,6 @@ static int touch_set_input_params(void)
 			ABS_MT_PRESSURE, 0, MAX_Z_VALUE, 0, 0);
 	input_set_abs_params(touch_hcd->input_dev,
 			ABS_MT_TOUCH_MAJOR, 0, MAX_MAJOR_VALUE, 0, 0);
-	input_set_abs_params(touch_hcd->input_dev,
-			ABS_MT_TOUCH_MINOR, 0, MAX_MINOR_VALUE, 0, 0);
 #endif
 
 	input_mt_init_slots(touch_hcd->input_dev, touch_hcd->max_objects,
@@ -1057,12 +946,6 @@ static int touch_set_input_dev(void)
 		return -ENODEV;
 	}
 
-	/* drv added by kuangliangjun, touch data reporting contrl, start */
-    if (underwater_report_status == false) {
-        return -ENODEV;
-    }
-    /* drv added by kuangliangjun, touch data reporting contrl, end */
-	
 	touch_hcd->input_dev->name = TOUCH_INPUT_NAME;
 	touch_hcd->input_dev->phys = TOUCH_INPUT_PHYS_PATH;
 	touch_hcd->input_dev->id.product = OMNIVISION_TCM_ID_PRODUCT;
@@ -1079,12 +962,10 @@ static int touch_set_input_dev(void)
 	set_bit(INPUT_PROP_DIRECT, touch_hcd->input_dev->propbit);
 #endif
 
-//drv modify by kuangliangjun for double tap wakeup function 20241010 start
 #if WAKEUP_GESTURE
-	set_bit(KEY_POWER, touch_hcd->input_dev->keybit);
-	input_set_capability(touch_hcd->input_dev, EV_KEY, KEY_POWER);
+	set_bit(KEY_WAKEUP, touch_hcd->input_dev->keybit);
+	input_set_capability(touch_hcd->input_dev, EV_KEY, KEY_WAKEUP);
 #endif
-//drv modify by kuangliangjun for double tap wakeup function 20241010 end
 
 	retval = touch_set_input_params();
 	if (retval < 0) {
@@ -1109,7 +990,23 @@ static int touch_set_input_dev(void)
 /*
 
 */
+#if SUPPORT_FACE_DETECT
+static int ovt_check_face_state(int current_face_state)
+{
+	//static int pre_face_state = FACE_STATUS_NONE;
+	if ((current_face_state == FACE_FAR_FROM_1_2_3_CLOSE_WHEN_SCREEN_ON) ||
+		(current_face_state == FACE_FAR_FROM_1_2_3_CLOSE_WHEN_SCREEN_OFF)) {
+		//report far event
+		printk("tcm check face far\n");
+	} else if ((current_face_state == FACE_CLOSE_1_SMALL_SIGNAL) ||
+				(current_face_state == FACE_CLOSE_FROM_1_2_3_CLOSE_WHEN_SCREEN_OFF)) {
 
+		//report close event
+		printk("tcm check face close\n");
+	}
+	return 0;
+}
+#endif
 /**
  * touch_set_report_config() - Set touch report configuration
  *
@@ -1123,16 +1020,12 @@ static int touch_set_report_config(void)
 	unsigned int length;
 	struct ovt_tcm_app_info *app_info;
 	struct ovt_tcm_hcd *tcm_hcd = touch_hcd->tcm_hcd;
-	int rows, cols;
-
-	app_info = &tcm_hcd->app_info;
-	rows = le2_to_uint(app_info->num_of_image_rows);
-	cols = le2_to_uint(app_info->num_of_image_cols);
 
 #ifdef USE_DEFAULT_TOUCH_REPORT_CONFIG
 	return 0;
 #endif
 
+	app_info = &tcm_hcd->app_info;
 	length = le2_to_uint(app_info->max_touch_report_config_size);
 
 	if (length < TOUCH_REPORT_CONFIG_SIZE) {
@@ -1154,25 +1047,21 @@ static int touch_set_report_config(void)
 	}
 
 	idx = 0;
+#if WAKEUP_GESTURE
 	touch_hcd->out.buf[idx++] = TOUCH_GESTURE_ID;
 	touch_hcd->out.buf[idx++] = 8;
-	touch_hcd->out.buf[idx++] = TOUCH_REPORT_PALM_DETECTED;
-	touch_hcd->out.buf[idx++] = 8;
+#endif
+#if SUPPORT_FACE_DETECT
 	touch_hcd->out.buf[idx++] = TOUCH_FACE_DETECT;
 	touch_hcd->out.buf[idx++] = 8;
-#ifdef SUPPORT_KNUCKLE_DATA_REPORT
+#endif
+#if SUPPORT_KNUCKLE_DATA_REPORT
 	touch_hcd->out.buf[idx++] = TOUCH_KNUCKLE_DATA;
 	touch_hcd->out.buf[idx++] = (KNUCKLE_DATA_SIZE * 8) & 0xff;
 	touch_hcd->out.buf[idx++] = (KNUCKLE_DATA_SIZE * 8) >> 8;
 #endif
-#ifdef SUPPORT_DEBUG_FRAME_DATA
-	touch_hcd->out.buf[idx++] = TOUCH_FRAME_DATA;
-	touch_hcd->out.buf[idx++] = (rows * cols * 2 * 8) & 0xff;
-	touch_hcd->out.buf[idx++] = (rows * cols * 2 * 8) >> 8;
-	touch_hcd->out.buf[idx++] = TOUCH_5_LINE_INFO;
-	touch_hcd->out.buf[idx++] = (5 * cols * 2 * 8) & 0xff;
-	touch_hcd->out.buf[idx++] = (5 * cols * 2 * 8) >> 8;
-#endif
+	touch_hcd->out.buf[idx++] = TOUCH_REPORT_PALM_DETECTED;
+	touch_hcd->out.buf[idx++] = 8;
 	touch_hcd->out.buf[idx++] = TOUCH_FOREACH_ACTIVE_OBJECT;
 	touch_hcd->out.buf[idx++] = TOUCH_OBJECT_N_INDEX;
 	touch_hcd->out.buf[idx++] = 4;
@@ -1267,6 +1156,8 @@ static int touch_set_input_reporting(void)
 {
 	int retval;
 	struct ovt_tcm_hcd *tcm_hcd = touch_hcd->tcm_hcd;
+	LOGE(tcm_hcd->pdev->dev.parent,
+				"touch_set_input_reporting enter\n");
 
 	if (IS_NOT_FW_MODE(tcm_hcd->id_info.mode) ||
 			tcm_hcd->app_status != APP_STATUS_OK) {
@@ -1431,6 +1322,22 @@ int touch_reinit(struct ovt_tcm_hcd *tcm_hcd)
 	return retval;
 }
 
+int touch_early_suspend(struct ovt_tcm_hcd *tcm_hcd)
+{
+	if (!touch_hcd)
+		return 0;
+
+	touch_hcd->suspend_touch_finger = true;
+	if (tcm_hcd->wakeup_gesture_enabled)
+		touch_hcd->suspend_touch = false;
+	else
+		touch_hcd->suspend_touch = true;
+
+	touch_free_objects();
+
+	return 0;
+}
+
 int touch_suspend(struct ovt_tcm_hcd *tcm_hcd)
 {
 	int retval;
@@ -1471,10 +1378,6 @@ int touch_resume(struct ovt_tcm_hcd *tcm_hcd)
 	if (!touch_hcd)
 		return 0;
 
-	/* drv added by kuangliangjun, touch data reporting contrl, start */
-	underwater_report_status = true;
-	/* drv added by kaungliangjun, touch data reporting contrl, start */
-	
 	touch_hcd->suspend_touch = false;
 	touch_hcd->suspend_touch_finger = false;
 

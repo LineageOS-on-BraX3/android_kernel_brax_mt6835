@@ -51,3 +51,11 @@ obj-$(CONFIG_PRIZE_SIM_STATE) += prize_sim_state/
 #drv added by yaozhipeng, zkw beidou power enable, 20240918-start
 obj-$(CONFIG_DRV_ZKWBD_EN) += beidou/
 #drv added by yaozhipeng, zkw beidou power enable, 20240918-end
+
+# drv added by ocean 20240330 begin
+obj-$(CONFIG_CS_NOTIFIER) += cs_notifier/
+# drv added by ocean 20240330 end
+
+# pri added for SL005TC-231 20250610 begin
+obj-$(CONFIG_CS_USB_BROADCAST) += cs_usb_broadcast/
+# pri added for SL005TC-231 20250610 end

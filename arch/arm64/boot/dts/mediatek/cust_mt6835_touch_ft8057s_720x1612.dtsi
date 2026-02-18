@@ -8,7 +8,7 @@
 
 	focaltech@0 {
 		status = "okay";
-		compatible = "tchip,ilitek","focaltech,fts";
+		compatible = "tchip,ilitek","focaltech,fts","omnivision,tcm-spi";
 		reg = <0>;
 		spi-max-frequency = <10000000>;
 		//vtouch-supply = <&mt6377_vtp>;
@@ -20,6 +20,14 @@
 		focaltech,irq-gpio = <&pio 4 0x0>;
 		focaltech,max-touch-number = <10>;
 		focaltech,display-coords = <0 0 720 1612>;
+
+		omnivision,irq-gpio   = <&pio 1 0>;
+		omnivision,reset-gpio = <&pio 24 0>;
+
+		omnivision,reset-active-ms = <20>;
+		omnivision,reset-delay-ms  = <200>;
+		omnivision,power-delay-ms  = <20>;
+		omnivision,spi-mode = <3>;
 
 		pinctrl-names = "spi_cs_suspend", "spi_cs_resume";
 		pinctrl-0 = <&spi_cs_int_suspend>;
