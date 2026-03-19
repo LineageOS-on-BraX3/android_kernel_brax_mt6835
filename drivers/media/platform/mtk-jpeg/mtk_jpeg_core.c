@@ -189,6 +189,7 @@ static int mtk_jpeg_enc_ctrls_setup(struct mtk_jpeg_ctx *ctx)
 
 	if (handler->error) {
 		v4l2_ctrl_handler_free(&ctx->ctrl_hdl);
+		pr_info("mtk_jpeg_enc_ctrl_setup fail");
 		return handler->error;
 	}
 
@@ -301,9 +302,16 @@ static int mtk_jpeg_try_fmt_mplane(struct v4l2_pix_format_mplane *pix_mp,
 		struct v4l2_plane_pix_format *pfmt = &pix_mp->plane_fmt[i];
 		u32 stride = pix_mp->width * fmt->h_sample[i] / 4;
 		u32 h = pix_mp->height * fmt->v_sample[i] / 4;
+		if (pix_mp->pixelformat == V4L2_PIX_FMT_YUYV ||
+			pix_mp->pixelformat == V4L2_PIX_FMT_YVYU) {
+			stride = round_up(pix_mp->width * 2, 32);
+			pfmt->bytesperline = stride;
+			pfmt->sizeimage = stride * h;
 
-		pfmt->bytesperline = stride;
-		pfmt->sizeimage = stride * h;
+		} else {
+		    pfmt->bytesperline = stride;
+		    pfmt->sizeimage = stride * h;
+		}
 	}
 	return 0;
 }
@@ -1124,6 +1132,7 @@ static void mtk_jpeg_enc_device_run(void *priv)
 	dst_buf = v4l2_m2m_next_dst_buf(ctx->fh.m2m_ctx);
 
 	ret = pm_runtime_get_sync(jpeg->dev);
+	v4l2_info(&jpeg->v4l2_dev, "jpeg_enc_device_run ret: %d", ret);
 	if (ret < 0)
 		goto enc_end;
 
@@ -1185,12 +1194,12 @@ static void mtk_jpeg_dec_device_run(void *priv)
 	if (ret < 0)
 		goto dec_end;
 
-	schedule_delayed_work(&jpeg->job_timeout_work,
-			      msecs_to_jiffies(MTK_JPEG_HW_TIMEOUT_MSEC));
-
 	mtk_jpeg_set_dec_src(ctx, &src_buf->vb2_buf, &bs);
 	if (mtk_jpeg_set_dec_dst(ctx, &jpeg_src_buf->dec_param, &dst_buf->vb2_buf, &fb))
 		goto dec_end;
+
+	schedule_delayed_work(&jpeg->job_timeout_work,
+			      msecs_to_jiffies(MTK_JPEG_HW_TIMEOUT_MSEC));
 
 	spin_lock_irqsave(&jpeg->hw_lock, flags);
 	mtk_jpeg_dec_reset(jpeg->reg_base);
@@ -1269,12 +1278,14 @@ static void mtk_jpeg_clk_on(struct mtk_jpeg_dev *jpeg)
 
 	ret = clk_bulk_prepare_enable(jpeg->variant->num_clks,
 				      jpeg->variant->clks);
+	v4l2_info(&jpeg->v4l2_dev, "jpeg_clk_on ret: %d", ret);
 	if (ret)
 		dev_err(jpeg->dev, "Failed to open jpeg clk: %d\n", ret);
 }
 
 static void mtk_jpeg_clk_off(struct mtk_jpeg_dev *jpeg)
 {
+	v4l2_info(&jpeg->v4l2_dev, "mtk_jpeg_clk_off");
 	clk_bulk_disable_unprepare(jpeg->variant->num_clks,
 				   jpeg->variant->clks);
 	mtk_smi_larb_put_ex(jpeg->larb, 1);
@@ -1470,6 +1481,7 @@ static int mtk_jpeg_release(struct file *file)
 	if (ctx->state == MTK_JPEG_RUNNING) {
 		mtk_jpeg_dvfs_end(ctx);
 		mtk_jpeg_end_bw_request(ctx);
+		v4l2_info(&jpeg->v4l2_dev, "jpeg_release call to pm_runtime_put");
 		pm_runtime_put(ctx->jpeg->dev);
 	}
 	mutex_lock(&jpeg->lock);
@@ -1546,7 +1558,7 @@ static void mtk_jpeg_job_timeout_work(struct work_struct *work)
 	dst_buf = v4l2_m2m_dst_buf_remove(ctx->fh.m2m_ctx);
 
 	jpeg->variant->hw_reset(jpeg->reg_base);
-
+	v4l2_info(&jpeg->v4l2_dev, "jpeg_job_timeout_work call to pm_runtime_put");
 	pm_runtime_put(jpeg->dev);
 
 	v4l2_m2m_buf_done(src_buf, VB2_BUF_STATE_ERROR);
@@ -1702,6 +1714,7 @@ err_req_irq:
 static int mtk_jpeg_remove(struct platform_device *pdev)
 {
 	struct mtk_jpeg_dev *jpeg = platform_get_drvdata(pdev);
+	v4l2_info(&jpeg->v4l2_dev, "mtk_jpeg_remove call to mtk_jpeg_clk_release");
 
 	cancel_delayed_work_sync(&jpeg->job_timeout_work);
 	pm_runtime_disable(&pdev->dev);
@@ -1716,7 +1729,7 @@ static int mtk_jpeg_remove(struct platform_device *pdev)
 static __maybe_unused int mtk_jpeg_pm_suspend(struct device *dev)
 {
 	struct mtk_jpeg_dev *jpeg = dev_get_drvdata(dev);
-
+	v4l2_info(&jpeg->v4l2_dev, "mtk_jpeg_pm_suspend call to mtk_jpeg_clk_off");
 	mtk_jpeg_clk_off(jpeg);
 
 	return 0;
@@ -1725,7 +1738,7 @@ static __maybe_unused int mtk_jpeg_pm_suspend(struct device *dev)
 static __maybe_unused int mtk_jpeg_pm_resume(struct device *dev)
 {
 	struct mtk_jpeg_dev *jpeg = dev_get_drvdata(dev);
-
+	v4l2_info(&jpeg->v4l2_dev, "mtk_jpeg_pm_resume call to mtk_jpeg_clk_on");
 	mtk_jpeg_clk_on(jpeg);
 
 	return 0;
