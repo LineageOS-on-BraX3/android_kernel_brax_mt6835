@@ -43,3 +43,4 @@ main2af-y  += common/gt9772baf/GT9772BAF.o
 main2af-y  += common/dw9800waf/DW9800WAF.o
 
 #prize add by lipengpeng 20210511 start
+main2af-y  += common/dw9714kaf/DW9714KAF.o

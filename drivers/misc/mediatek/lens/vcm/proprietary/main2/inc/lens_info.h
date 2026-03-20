@@ -60,7 +60,7 @@
 #define AFDRV_DW9800WAF "DW9800WAF"
 //#define AFDRV_AW86014AF "AW86014AF"
 //prize add by lipengpeng 20210511 start 
-
+#define AFDRV_DW9714KAF "DW9714KAF" 
 /* Structures */
 struct stAF_MotorInfo {
 	/* current position */

@@ -3694,13 +3694,17 @@ exit:
 	/* pri added for SL005TC-231 notifier 20250609 begin */
 #if IS_ENABLED(CONFIG_CS_NOTIFIER)
 #if IS_ENABLED(CONFIG_TOUCHSCREEN_OMNIVISION_TCM_CHARGER)
+	
 	if (tcm_hcd->usb_state) {
+		printk("lsr charger2");
 		LOGN(tcm_hcd->pdev->dev.parent,"Charging plug in!\n");
 		ovt_tcm_set_func_charger_connected_en_state(1);
 	}
 #endif
 #if IS_ENABLED(CONFIG_TOUCHSCREEN_OMNIVISION_TCM_EAR_PHONE)
+	
 	if (tcm_hcd->earphone_state) {
+		printk("lsr ear");
 		LOGN(tcm_hcd->pdev->dev.parent,"Earphone plug in!\n");
 		ovt_tcm_set_func_ear_phone_connected_en_state(1);
 	}
@@ -3927,6 +3931,7 @@ static int ovt_tcm_usb_notifier_callback(struct notifier_block *nb, unsigned lon
 	struct ovt_tcm_hcd *tcm_hcd =
 				container_of(nb, struct ovt_tcm_hcd, usb_notifier);
 
+	printk("lsr usb callback");
 	LOGD(tcm_hcd->pdev->dev.parent, "notifier,event:%lu\n", event);
 	if (event == USB_PLUG_IN) {
 		tcm_hcd->usb_state = 1;
@@ -3946,9 +3951,11 @@ static int ovt_tcm_usb_notifier_callback(struct notifier_block *nb, unsigned lon
 #if IS_ENABLED(CONFIG_TOUCHSCREEN_OMNIVISION_TCM_EAR_PHONE)
 static int ovt_tcm_earphone_notifier_callback(struct notifier_block *nb, unsigned long event, void *data)
 {
+	
 	struct ovt_tcm_hcd *tcm_hcd =
 				container_of(nb, struct ovt_tcm_hcd, earphone_notifier);
 
+	printk("lsr ear1");
 	LOGD(tcm_hcd->pdev->dev.parent, "notifier,event:%lu\n", event);
 	if (event == EARPHONE_PLUG_IN) {
 		tcm_hcd->earphone_state = 1;

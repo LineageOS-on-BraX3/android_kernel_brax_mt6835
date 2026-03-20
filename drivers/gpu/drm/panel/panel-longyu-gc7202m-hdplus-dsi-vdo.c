@@ -54,6 +54,13 @@ extern struct hardware_info current_lcm_info;
 extern g_tp_gesture_flag;
 /* prize added by KLJ, prize tp gesture function, 20240418-start */
 
+#if IS_ENABLED(CONFIG_CS_NOTIFIER)
+#include <../../../misc/mediatek/prize/cs_notifier/cs_notifier.h>
+#endif
+#if IS_ENABLED(CONFIG_CS_NOTIFIER)
+static struct panel_event_blank_data lcd_tp_event;
+#endif
+
 #define HFP_SUPPORT 0
 
 #if HFP_SUPPORT
@@ -1004,11 +1011,19 @@ printk("drm_mode_vrefresh  60hz\n");
 #if HFP_SUPPORT
 		current_fps = 60;
 #endif
+#if IS_ENABLED(CONFIG_CS_NOTIFIER)
+	lcd_tp_event.blank  = PANEL_BLANK_DOZE_ENABLE;
+	cs_panel_notifier_call_chain(CS_PANEL_EVENT_BLANK,&lcd_tp_event);
+#endif
 	} else if (drm_mode_vrefresh(m)== 90) {
 printk("drm_mode_vrefresh  90hz\n");	
 		ext->params = &ext_params_90;
 #if HFP_SUPPORT
 		current_fps = 90;
+#endif
+#if IS_ENABLED(CONFIG_CS_NOTIFIER)
+	lcd_tp_event.blank  = PANEL_BLANK_DOZE_DISABLE;
+	cs_panel_notifier_call_chain(CS_PANEL_EVENT_BLANK,&lcd_tp_event);
 #endif
 	} else
 		ret = 1;

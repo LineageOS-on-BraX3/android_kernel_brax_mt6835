@@ -60,6 +60,7 @@ void gcore_resume(void)
 	struct gcore_dev *gdev = fn_data.gdev;
 
 	GTP_DEBUG("enter gcore resume");
+	gc7272_gesture_count = 1;
 	
 #ifdef	CONFIG_ENABLE_PROXIMITY_TP_SCREEN_OFF
 		if(fn_data.gdev->PS_Enale == true){

@@ -4,7 +4,7 @@ config TOUCHSCREEN_OMNIVISION_TCM
 	help
 	Say Y here if you have Omnivision_tcm touch panel.
 	If unsure, say N.
-        
+
 config TOUCHSCREEN_OMNIVISION_TCM_EAR_PHONE
     tristate "Omnivision TCM earphone mode"
 	help

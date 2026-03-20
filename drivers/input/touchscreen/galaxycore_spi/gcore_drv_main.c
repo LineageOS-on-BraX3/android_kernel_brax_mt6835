@@ -42,6 +42,12 @@
 #include <linux/power_supply.h>
 #endif
 
+#if IS_ENABLED(CONFIG_CS_NOTIFIER)
+#include <../../../misc/mediatek/prize/cs_notifier/cs_notifier.h>
+extern void gc7202_report_rate_change(int value);
+bool gc7202_probed = false;
+EXPORT_SYMBOL(gc7202_probed);
+#endif
 #ifdef CONFIG_FB
 #include <linux/fb.h>
 #endif
@@ -621,6 +627,8 @@ void gcore_touch_release_all_point255(struct input_dev *dev)
 }
 
 #ifdef CONFIG_ENABLE_GESTURE_WAKEUP
+int gc7272_gesture_count = 1;
+EXPORT_SYMBOL(gc7272_gesture_count);
 void gcore_gesture_event_handler(struct input_dev *dev, int id)
 {
 
@@ -636,11 +644,14 @@ void gcore_gesture_event_handler(struct input_dev *dev, int id)
     /* drv added by kuangliangjun, touch data reporting contrl, end */
 	switch (id) {
 	case GESTURE_DOUBLE_CLICK:
+		if (gc7272_gesture_count == 1) {
 		GTP_DEBUG("double click gesture event");
 		input_report_key(dev, GESTURE_KEY, 1);
 		input_sync(dev);
 		input_report_key(dev, GESTURE_KEY, 0);
 		input_sync(dev);
+		gc7272_gesture_count = 0;
+		}
 		break;
 
 	case GESTURE_UP:
@@ -656,7 +667,7 @@ void gcore_gesture_event_handler(struct input_dev *dev, int id)
 		break;
 
 	case GESTURE_C:
-		GTP_DEBUG("double click gesture event");
+		GTP_DEBUG("GESTURE_C gesture event");
 		input_report_key(dev, KEY_F24, 1);
 		input_sync(dev);
 		input_report_key(dev, KEY_F24, 0);
@@ -1677,11 +1688,45 @@ void gcore_deinit(struct gcore_dev *gdev)
 	
 }
 
+#if IS_ENABLED(CONFIG_CS_NOTIFIER)
+static int cs_notifier_callback(struct notifier_block *nb,
+                               unsigned long event, void *data)
+{
+	struct panel_event_blank_data *lcd_tp_event = data;
+	int blank_value = lcd_tp_event->blank;
+	//struct gcore_dev *ts_data = container_of(nb,  struct gcore_dev, cs_notifier);
+
+	GTP_DEBUG("notifier,event:%lu,blank:%d", event, blank_value);
+
+	switch(event) {
+	case CS_PANEL_EVENT_BLANK:
+		switch(blank_value) {
+		case PANEL_BLANK_DOZE_ENABLE:
+			gc7202_report_rate_change(60);
+			break;
+		case PANEL_BLANK_DOZE_DISABLE:
+			gc7202_report_rate_change(90);
+			break;
+        }
+		break;
+	default:
+		GTP_DEBUG("notifier,event:%lu,blank:%d, not care", event, blank_value);
+		break;
+	}
+
+	return 0;
+}
+/*pri LAX10-651 modify by ocean 20240611 end*/
+#endif
+
 int gcore_touch_probe(struct gcore_dev *gdev)
 {
 #if 0
 	struct gcore_exp_fn *exp_fn = NULL;
 	struct gcore_exp_fn *exp_fn_temp = NULL;
+#endif
+#if IS_ENABLED(CONFIG_CS_NOTIFIER)
+	int ret = 0;
 #endif
 //drv modify by kuangliangjun for judge charger mode 20241126 start
 	int val = 0;
@@ -1760,6 +1805,15 @@ int gcore_touch_probe(struct gcore_dev *gdev)
 #endif
 #endif
 
+#if IS_ENABLED(CONFIG_CS_NOTIFIER)
+	gdev->cs_notifier.notifier_call = cs_notifier_callback;
+	ret = cs_panel_notifier_register(&gdev->cs_notifier);
+	if (ret < 0) {
+		GTP_ERROR("Fail to register cs notifier client\n");
+	}
+#endif
+
+
 #ifdef CONFIG_TOUCH_DRIVER_RUN_ON_QCOM_PLATFORM
 #ifdef CONFIG_DRM
 	GTP_DEBUG("Init notifier_drm struct");
@@ -1770,6 +1824,10 @@ int gcore_touch_probe(struct gcore_dev *gdev)
 			GTP_ERROR("register notifier failed!");
 	}
 #endif
+#endif
+
+#if IS_ENABLED(CONFIG_CS_NOTIFIER)
+	gc7202_probed = true;
 #endif
 
 	return 0;

@@ -847,6 +847,28 @@ int gcore_fw_event_notify(enum fw_event_type event)
 	
 }
 
+#if IS_ENABLED(CONFIG_CS_NOTIFIER)
+extern bool gc7202_probed;
+void gc7202_report_rate_change(int value)
+{
+
+	if (gc7202_probed == false) {
+		GTP_ERROR("gcore not probe return");
+		return;
+	}
+	if (value == 90){
+		GTP_ERROR("value = %d FW_REPORT_RATE_180", value);
+		gcore_fw_event_notify(FW_REPORT_RATE_180);
+	}else if (value == 60){
+		GTP_ERROR("value = %d FW_REPORT_RATE_120", value);
+		gcore_fw_event_notify(FW_REPORT_RATE_120);
+	} else{
+		gcore_fw_event_notify(FW_REPORT_RATE_120);
+	}
+}
+EXPORT_SYMBOL(gc7202_report_rate_change);
+#endif
+
 void gcore_modify_fw_event_cmd(enum fw_event_type event)
 {
 	GTP_DEBUG("start modify event cmd");

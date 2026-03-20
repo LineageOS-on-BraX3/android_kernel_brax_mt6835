@@ -1665,7 +1665,7 @@ static void eint_work_callback(struct work_struct *work)
 		accdet_init();
 
 		enable_accdet(0);
-          	#if IS_ENABLED(CONFIG_CS_NOTIFIER)
+		#if IS_ENABLED(CONFIG_CS_NOTIFIER)
 		#if IS_ENABLED(CONFIG_TOUCHSCREEN_OMNIVISION_TCM_EAR_PHONE)
 		cs_earphone_notifier_call_chain(EARPHONE_PLUG_IN, NULL);
 		#endif
@@ -1684,7 +1684,7 @@ static void eint_work_callback(struct work_struct *work)
 			ACCDET_SW_EN_SFT);
 		disable_accdet();
 		headset_plug_out();
-          	#if IS_ENABLED(CONFIG_CS_NOTIFIER)
+		#if IS_ENABLED(CONFIG_CS_NOTIFIER)
 		#if IS_ENABLED(CONFIG_TOUCHSCREEN_OMNIVISION_TCM_EAR_PHONE)
 		cs_earphone_notifier_call_chain(EARPHONE_PLUG_OUT, NULL);
 		#endif

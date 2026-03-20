@@ -190,6 +190,8 @@ extern int notify_contin;
 #define GESTURE_MAX                16
 
 #define GESTURE_KEY   KEY_POWER
+
+extern int gc7272_gesture_count;
 #endif
 
 #ifdef CONFIG_ENABLE_FW_RAWDATA
@@ -321,6 +323,11 @@ struct gcore_dev {
 #ifdef TP_RESUME_BY_FB_NOTIFIER
 	struct notifier_block disp_notifier;
 #endif
+
+#if IS_ENABLED(CONFIG_CS_NOTIFIER)
+	struct notifier_block cs_notifier;
+#endif
+
 //tian add notify event 
 	struct delayed_work event_work;
 	bool tel_screen_off;
